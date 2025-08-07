@@ -49,51 +49,152 @@ class DataController {
       const fromCoords = from.split(',').map(Number);
       const toCoords = to.split(',').map(Number);
 
-      // Find routes that pass near these coordinates
-      const routes = await Route.find({
-        $and: [
-          {
-            'stops.location': {
-              $near: {
-                $geometry: {
-                  type: 'Point',
-                  coordinates: fromCoords
-                },
-                $maxDistance: 5000 // 5km radius
-              }
-            }
-          },
-          {
-            'stops.location': {
-              $near: {
-                $geometry: {
-                  type: 'Point',
-                  coordinates: toCoords
-                },
-                $maxDistance: 5000 // 5km radius
-              }
+      // Validate coordinates
+      if (fromCoords.length !== 2 || toCoords.length !== 2 || 
+          fromCoords.some(isNaN) || toCoords.some(isNaN)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid coordinate format. Use: longitude,latitude'
+        });
+      }
+
+      // First, find routes near the starting point
+      const routesNearStart = await Route.find({
+        'stops.location': {
+          $near: {
+            $geometry: {
+              type: 'Point',
+              coordinates: fromCoords
+            },
+            $maxDistance: 5000 // 5km radius
+          }
+        }
+      }).populate('schedules');
+
+      // Then filter those routes to see which ones also pass near the destination
+      const validRoutes = [];
+      
+      for (const route of routesNearStart) {
+        // Check if this route has a stop near the destination
+        const hasDestinationStop = route.stops.some(stop => {
+          const distance = calculateDistance(toCoords, stop.location.coordinates);
+          return distance <= 5000; // 5km radius
+        });
+        
+        if (hasDestinationStop) {
+          validRoutes.push(route);
+        }
+      }
+
+      // If no routes found with the stops approach, try path-based search
+      if (validRoutes.length === 0) {
+        console.log('No routes found with stops, trying path-based search...');
+        
+        const routesNearStartPath = await Route.find({
+          'path': {
+            $near: {
+              $geometry: {
+                type: 'Point',
+                coordinates: fromCoords
+              },
+              $maxDistance: 5000
             }
           }
-        ]
-      }).populate('schedules');
+        }).populate('schedules');
+
+        for (const route of routesNearStartPath) {
+          // Check if route path passes near destination
+          if (route.path && route.path.coordinates) {
+            const pathPassesDestination = route.path.coordinates.some(coord => {
+              const distance = calculateDistance(toCoords, coord);
+              return distance <= 5000;
+            });
+            
+            if (pathPassesDestination) {
+              validRoutes.push(route);
+            }
+          }
+        }
+      }
 
       // Calculate route details for each found route
       const routeDetails = await Promise.all(
-        routes.map(async (route) => {
-          const details = await getRouteDetails(fromCoords, toCoords);
-          return {
-            route,
-            distance: details.distance,
-            duration: details.duration,
-            distanceText: details.distanceText,
-            durationText: details.durationText
-          };
+        validRoutes.map(async (route) => {
+          try {
+            const details = await getRouteDetails(fromCoords, toCoords);
+            
+            // Find the closest stops to start and end points
+            let startStop = null;
+            let endStop = null;
+            let minStartDistance = Infinity;
+            let minEndDistance = Infinity;
+            
+            route.stops.forEach(stop => {
+              const startDistance = calculateDistance(fromCoords, stop.location.coordinates);
+              const endDistance = calculateDistance(toCoords, stop.location.coordinates);
+              
+              if (startDistance < minStartDistance) {
+                minStartDistance = startDistance;
+                startStop = stop;
+              }
+              
+              if (endDistance < minEndDistance) {
+                minEndDistance = endDistance;
+                endStop = stop;
+              }
+            });
+            
+            return {
+              route: {
+                _id: route._id,
+                name: route.name,
+                description: route.description,
+                distance: route.distance,
+                estimatedDuration: route.estimatedDuration,
+                costPerKm: route.costPerKm
+              },
+              startStop,
+              endStop,
+              distance: details.distance,
+              duration: details.duration,
+              distanceText: details.distanceText,
+              durationText: details.durationText,
+              walkingDistanceToStart: Math.round(minStartDistance),
+              walkingDistanceFromEnd: Math.round(minEndDistance)
+            };
+          } catch (error) {
+            console.error('Error calculating route details:', error);
+            // Return basic info if API call fails
+            return {
+              route: {
+                _id: route._id,
+                name: route.name,
+                description: route.description,
+                distance: route.distance,
+                estimatedDuration: route.estimatedDuration,
+                costPerKm: route.costPerKm
+              },
+              distance: route.distance * 1000, // Convert km to meters
+              duration: route.estimatedDuration * 60, // Convert minutes to seconds
+              distanceText: `${route.distance} km`,
+              durationText: `${route.estimatedDuration} mins`,
+              error: 'Route details calculation failed'
+            };
+          }
         })
       );
 
       res.json({
         success: true,
-        data: routeDetails
+        data: {
+          routes: routeDetails,
+          searchCriteria: {
+            from: fromCoords,
+            to: toCoords,
+            searchRadius: '5km'
+          },
+          totalRoutes: routeDetails.length
+        }
       });
 
     } catch (error) {
