@@ -7,8 +7,7 @@ const journeySchema = new mongoose.Schema({
         required: true
     },
     passengerId: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'Passenger',
+        type: String, // Change from ObjectId to String
         required: true
     },
     driverId: {

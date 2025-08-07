@@ -43,6 +43,100 @@ app.use('/api/routes', routeRoutes);
 app.use('/api/journeys', journeyRoutes);
 app.use('/api/schedules', scheduleRoutes);
 
+// Debug routes
+app.get('/api/debug/token', (req, res) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader) {
+    return res.status(400).json({
+      success: false,
+      message: 'No token provided'
+    });
+  }
+
+  const token = authHeader.startsWith('Bearer ') ? authHeader.substring(7) : authHeader;
+  
+  try {
+    // Manual token inspection
+    const tokenParts = token.split('.');
+    if (tokenParts.length !== 3) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid token format'
+      });
+    }
+
+    // Decode without verification
+    const header = JSON.parse(Buffer.from(tokenParts[0], 'base64').toString());
+    const payload = JSON.parse(Buffer.from(tokenParts[1], 'base64').toString());
+    
+    // Try to verify
+    let verified = false;
+    let verifyError = null;
+    try {
+      jwt.verify(token, process.env.JWT_SECRET);
+      verified = true;
+    } catch (err) {
+      verifyError = err.message;
+    }
+
+    res.json({
+      success: true,
+      token: {
+        format: 'valid',
+        header,
+        payload,
+        verification: {
+          success: verified,
+          error: verifyError
+        },
+        citizenId: payload.citizenId || 'not found',
+        env: {
+          nodeEnv: process.env.NODE_ENV,
+          jwtSecretLength: process.env.JWT_SECRET ? process.env.JWT_SECRET.length : 0,
+          jwtSecretStart: process.env.JWT_SECRET ? process.env.JWT_SECRET.substring(0, 5) + '...' : 'undefined'
+        }
+      }
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      message: 'Error analyzing token',
+      error: error.message
+    });
+  }
+});
+
+// Add to server.js - FOR DEVELOPMENT ONLY!
+app.get('/api/debug/generate-token', (req, res) => {
+  if (process.env.NODE_ENV === 'production') {
+    return res.status(403).json({
+      success: false,
+      message: 'Not available in production'
+    });
+  }
+
+  const jwt = require('jsonwebtoken');
+  const testPayload = {
+    citizenId: 'TEST_USER_ID_123',
+    email: 'test@example.com',
+    role: 'citizen',
+    type: 'access'
+  };
+
+  const token = jwt.sign(testPayload, process.env.JWT_SECRET, {
+    expiresIn: '1h',
+    issuer: 'SLUDI',
+    audience: 'DPI-ECOSYSTEM'
+  });
+
+  res.json({
+    success: true,
+    message: 'Test token generated',
+    token,
+    jwtSecret: process.env.JWT_SECRET.substring(0, 5) + '...' + process.env.JWT_SECRET.slice(-5)
+  });
+});
+
 // 404 handler
 app.use('*', (req, res) => {
   res.status(404).json({

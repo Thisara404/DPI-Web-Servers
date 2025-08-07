@@ -9,9 +9,41 @@ class JourneyController {
     try {
       const { scheduleId, startLocation, endLocation, fare, seatNumber } = req.body;
       
+      let passengerId = 'anonymous';
+      
+      // Try to get citizenId from req.citizen (set by auth middleware)
+      if (req.citizen && req.citizen.citizenId && req.citizen.citizenId !== 'anonymous') {
+        passengerId = req.citizen.citizenId;
+      } 
+      // Check if manual extraction from token is needed
+      else if (req.headers.authorization) {
+        try {
+          const token = req.headers.authorization.startsWith('Bearer ') 
+            ? req.headers.authorization.substring(7) 
+            : req.headers.authorization;
+          
+          const tokenParts = token.split('.');
+          const payload = JSON.parse(Buffer.from(tokenParts[1], 'base64').toString());
+          if (payload && payload.citizenId) {
+            passengerId = payload.citizenId;
+            console.log('✅ citizenId manually extracted from token:', passengerId);
+          }
+        } catch (e) {
+          console.error('Failed to manually extract citizenId:', e);
+        }
+      }
+      
+      // For development/testing, allow override
+      if (req.body.passengerId) {
+        passengerId = req.body.passengerId;
+        console.log('⚠️ Using passengerId from request body:', passengerId);
+      }
+      
+      console.log('🧍 Creating journey with passengerId:', passengerId);
+      
       const journey = new Journey({
         scheduleId,
-        passengerId: req.citizen.citizenId,
+        passengerId, // Use the extracted/fallback ID
         routeDetails: {
           startLocation,
           endLocation
