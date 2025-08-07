@@ -74,7 +74,7 @@ const journeySchema = new mongoose.Schema({
         default: false
     },
     verifiedBy: {
-        type: mongoose.Schema.Types.ObjectId,
+        type: String, // Change from ObjectId to String to match citizenId format
         ref: 'Driver'
     },
     verifiedAt: Date,
