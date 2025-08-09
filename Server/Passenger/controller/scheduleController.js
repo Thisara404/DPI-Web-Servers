@@ -1,5 +1,5 @@
 const apiGateway = require("../config/apiGateway");
-const Passenger = require("../models/Passenger");
+const Passenger = require("../model/Passenger");
 
 class ScheduleController {
   // Get all schedules from NDX

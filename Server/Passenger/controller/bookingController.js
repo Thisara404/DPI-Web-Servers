@@ -1,6 +1,6 @@
-const Booking = require("../models/Booking");
-const Ticket = require("../models/Ticket");
-const Passenger = require("../models/Passenger");
+const Booking = require("../model/Booking");
+const Ticket = require("../model/Ticket");
+const Passenger = require("../model/Passenger");
 const apiGateway = require("../config/apiGateway");
 const qrService = require("../services/qrService");
 const { v4: uuidv4 } = require("uuid");
