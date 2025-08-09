@@ -77,7 +77,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     const SizedBox(height: 20),
-                    
+
                     // Title
                     Text(
                       'Create Driver Account',
@@ -114,7 +114,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         if (value?.isEmpty ?? true) {
                           return 'Please enter your email';
                         }
-                        if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}).hasMatch(value!)) {
+                        if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
+                            .hasMatch(value!)) {
                           return 'Please enter a valid email';
                         }
                         return null;
@@ -163,7 +164,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         labelText: 'Password',
                         prefixIcon: const Icon(Icons.lock),
                         suffixIcon: IconButton(
-                          icon: Icon(_obscurePassword ? Icons.visibility : Icons.visibility_off),
+                          icon: Icon(_obscurePassword
+                              ? Icons.visibility
+                              : Icons.visibility_off),
                           onPressed: () {
                             setState(() {
                               _obscurePassword = !_obscurePassword;
@@ -191,10 +194,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         labelText: 'Confirm Password',
                         prefixIcon: const Icon(Icons.lock_outline),
                         suffixIcon: IconButton(
-                          icon: Icon(_obscureConfirmPassword ? Icons.visibility : Icons.visibility_off),
+                          icon: Icon(_obscureConfirmPassword
+                              ? Icons.visibility
+                              : Icons.visibility_off),
                           onPressed: () {
                             setState(() {
-                              _obscureConfirmPassword = !_obscureConfirmPassword;
+                              _obscureConfirmPassword =
+                                  !_obscureConfirmPassword;
                             });
                           },
                         ),
@@ -216,7 +222,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       onPressed: authProvider.isLoading ? null : _register,
                       child: authProvider.isLoading
                           ? const CircularProgressIndicator(color: Colors.white)
-                          : const Text('Register', style: TextStyle(fontSize: 16)),
+                          : const Text('Register',
+                              style: TextStyle(fontSize: 16)),
                     ),
                     const SizedBox(height: 16),
 

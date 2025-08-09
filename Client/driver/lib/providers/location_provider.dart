@@ -1,8 +1,7 @@
 import 'dart:async';
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
-import '../config/api_endpoints.dart';
+import '../config/api.endpoints.dart';
 import '../services/api_service.dart';
 
 class LocationProvider extends ChangeNotifier {
@@ -50,9 +49,11 @@ class LocationProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await ApiService.post(ApiEndpoints.trackingStart, {'scheduleId': scheduleId});
+      await ApiService.post(
+          ApiEndpoints.trackingStart, {'scheduleId': scheduleId});
     } catch (e) {
       _error = 'Failed to start tracking: ${e.toString()}';
+      notifyListeners();
     }
 
     const LocationSettings locationSettings = LocationSettings(
@@ -75,7 +76,8 @@ class LocationProvider extends ChangeNotifier {
     );
   }
 
-  Future<void> _updateLocationOnServer(String scheduleId, Position position) async {
+  Future<void> _updateLocationOnServer(
+      String scheduleId, Position position) async {
     try {
       await ApiService.post(
         ApiEndpoints.trackingUpdate,
@@ -83,11 +85,15 @@ class LocationProvider extends ChangeNotifier {
           'scheduleId': scheduleId,
           'latitude': position.latitude,
           'longitude': position.longitude,
+          'bearing': position.heading,
+          'speed': position.speed,
+          'accuracy': position.accuracy,
           'timestamp': DateTime.now().toIso8601String(),
         },
       );
     } catch (e) {
       // Ignore individual update errors to avoid stopping tracking
+      print('Location update error: $e');
     }
   }
 
@@ -97,7 +103,8 @@ class LocationProvider extends ChangeNotifier {
     _positionStreamSubscription = null;
 
     try {
-      await ApiService.post(ApiEndpoints.trackingStop, {'scheduleId': scheduleId});
+      await ApiService.post(
+          ApiEndpoints.trackingStop, {'scheduleId': scheduleId});
     } catch (e) {
       _error = 'Failed to stop tracking: ${e.toString()}';
     }

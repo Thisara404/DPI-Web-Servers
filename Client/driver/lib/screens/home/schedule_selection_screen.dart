@@ -3,14 +3,17 @@ import 'package:provider/provider.dart';
 import '../../config/theme.dart';
 import '../../providers/schedule_provider.dart';
 import '../../providers/journey_provider.dart';
+import '../../providers/location_provider.dart';
 import '../../models/schedule.dart';
 import 'journey_screen.dart';
+import 'home_screen.dart';
 
 class ScheduleSelectionScreen extends StatefulWidget {
   const ScheduleSelectionScreen({Key? key}) : super(key: key);
 
   @override
-  State<ScheduleSelectionScreen> createState() => _ScheduleSelectionScreenState();
+  State<ScheduleSelectionScreen> createState() =>
+      _ScheduleSelectionScreenState();
 }
 
 class _ScheduleSelectionScreenState extends State<ScheduleSelectionScreen> {
@@ -18,16 +21,19 @@ class _ScheduleSelectionScreenState extends State<ScheduleSelectionScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      Provider.of<ScheduleProvider>(context, listen: false).fetchActiveSchedules();
+      Provider.of<ScheduleProvider>(context, listen: false)
+          .fetchActiveSchedules();
     });
   }
 
   Future<void> _startJourney(Schedule schedule) async {
-    final journeyProvider = Provider.of<JourneyProvider>(context, listen: false);
-    final scheduleProvider = Provider.of<ScheduleProvider>(context, listen: false);
+    final journeyProvider =
+        Provider.of<JourneyProvider>(context, listen: false);
+    final scheduleProvider =
+        Provider.of<ScheduleProvider>(context, listen: false);
 
     final success = await journeyProvider.startJourney(schedule.id);
-    
+
     if (success && mounted) {
       scheduleProvider.selectSchedule(schedule);
       Navigator.pushReplacement(
@@ -37,59 +43,20 @@ class _ScheduleSelectionScreenState extends State<ScheduleSelectionScreen> {
     } else if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('Are you sure you want to end this journey?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.errorRed),
-            child: const Text('End Journey'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed == true) {
-      final selectedSchedule = scheduleProvider.selectedSchedule;
-      if (selectedSchedule != null) {
-        await locationProvider.stopTracking(selectedSchedule.id);
-      }
-      
-      final success = await journeyProvider.endJourney();
-      
-      if (success && mounted) {
-        scheduleProvider.clearSelectedSchedule();
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (context) => const HomeScreen()),
-          (route) => false,
-        );
-      } else if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(journeyProvider.error ?? 'Failed to end journey'),
-            backgroundColor: AppTheme.errorRed,
-          ),
-        );
-      }
+          content: Text(journeyProvider.error ?? 'Failed to start journey'),
+          backgroundColor: AppTheme.errorRed,
+        ),
+      );
     }
-  }
-
-  void _onMapCreated(GoogleMapController controller) {
-    _controller.complete(controller);
-    _mapController = controller;
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Journey Tracking'),
+        title: const Text('Select Schedule'),
         leading: IconButton(
-          icon: const Icon(Icons.home),
+          icon: const Icon(Icons.arrow_back),
           onPressed: () {
             Navigator.pushAndRemoveUntil(
               context,
@@ -98,217 +65,113 @@ class _ScheduleSelectionScreenState extends State<ScheduleSelectionScreen> {
             );
           },
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.stop, color: AppTheme.errorRed),
-            onPressed: _endJourney,
-          ),
-        ],
       ),
-      body: Consumer3<ScheduleProvider, JourneyProvider, LocationProvider>(
-        builder: (context, scheduleProvider, journeyProvider, locationProvider, child) {
-          final selectedSchedule = scheduleProvider.selectedSchedule;
-          final currentPosition = locationProvider.currentPosition;
+      body: Consumer<ScheduleProvider>(
+        builder: (context, scheduleProvider, child) {
+          if (scheduleProvider.isLoading) {
+            return const Center(child: CircularProgressIndicator());
+          }
 
-          return Column(
-            children: [
-              // Journey Info Card
-              if (selectedSchedule != null) ...[
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(16),
-                  color: AppTheme.surfaceDark,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        selectedSchedule.routeName,
-                        style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          const Icon(Icons.location_on, color: AppTheme.successGreen, size: 16),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              '${selectedSchedule.startLocation} → ${selectedSchedule.endLocation}',
-                              style: Theme.of(context).textTheme.bodyMedium,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Row(
-                            children: [
-                              Icon(
-                                locationProvider.isTracking ? Icons.gps_fixed : Icons.gps_off,
-                                color: locationProvider.isTracking ? AppTheme.successGreen : AppTheme.errorRed,
-                                size: 16,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                locationProvider.isTracking ? 'Live Tracking' : 'Tracking Disabled',
-                                style: TextStyle(
-                                  color: locationProvider.isTracking ? AppTheme.successGreen : AppTheme.errorRed,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
-                          ),
-                          if (selectedSchedule.busNumber != null) ...[
-                            Text(
-                              'Bus: ${selectedSchedule.busNumber}',
-                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ],
+          if (scheduleProvider.error != null) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.error_outline,
+                    size: 64,
+                    color: AppTheme.errorRed,
                   ),
-                ),
-              ],
-
-              // Map View
-              Expanded(
-                child: currentPosition != null
-                    ? GoogleMap(
-                        onMapCreated: _onMapCreated,
-                        initialCameraPosition: CameraPosition(
-                          target: LatLng(
-                            currentPosition.latitude,
-                            currentPosition.longitude,
-                          ),
-                          zoom: 16,
-                        ),
-                        markers: {
-                          Marker(
-                            markerId: const MarkerId('current_location'),
-                            position: LatLng(
-                              currentPosition.latitude,
-                              currentPosition.longitude,
-                            ),
-                            infoWindow: const InfoWindow(title: 'Your Location'),
-                            icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
-                          ),
-                        },
-                        myLocationEnabled: true,
-                        myLocationButtonEnabled: true,
-                        mapType: MapType.normal,
-                        compassEnabled: true,
-                        trafficEnabled: true,
-                      )
-                    : const Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            CircularProgressIndicator(),
-                            SizedBox(height: 16),
-                            Text('Getting your location...'),
-                          ],
-                        ),
-                      ),
+                  const SizedBox(height: 16),
+                  Text(
+                    scheduleProvider.error!,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 16),
+                  ),
+                  const SizedBox(height: 24),
+                  ElevatedButton(
+                    onPressed: () {
+                      scheduleProvider.fetchActiveSchedules();
+                    },
+                    child: const Text('Retry'),
+                  ),
+                ],
               ),
+            );
+          }
 
-              // Bottom Controls
-              Container(
-                padding: const EdgeInsets.all(16),
-                color: AppTheme.surfaceDark,
-                child: Column(
-                  children: [
-                    if (locationProvider.error != null) ...[
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        margin: const EdgeInsets.only(bottom: 12),
-                        decoration: BoxDecoration(
-                          color: AppTheme.errorRed.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: AppTheme.errorRed),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.error, color: AppTheme.errorRed),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Text(
-                                locationProvider.error!,
-                                style: const TextStyle(color: AppTheme.errorRed),
-                              ),
-                            ),
-                            TextButton(
-                              onPressed: locationProvider.clearError,
-                              child: const Text('Dismiss'),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                    Row(
+          if (scheduleProvider.schedules.isEmpty) {
+            return const Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.schedule,
+                    size: 64,
+                    color: Colors.grey,
+                  ),
+                  SizedBox(height: 16),
+                  Text(
+                    'No active schedules available',
+                    style: TextStyle(fontSize: 18),
+                  ),
+                  SizedBox(height: 8),
+                  Text(
+                    'Check back later for new schedules',
+                    style: TextStyle(color: Colors.grey),
+                  ),
+                ],
+              ),
+            );
+          }
+
+          return RefreshIndicator(
+            onRefresh: () => scheduleProvider.fetchActiveSchedules(),
+            child: ListView.builder(
+              padding: const EdgeInsets.all(16),
+              itemCount: scheduleProvider.schedules.length,
+              itemBuilder: (context, index) {
+                final schedule = scheduleProvider.schedules[index];
+                return Card(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  child: ListTile(
+                    title: Text(
+                      schedule.routeName,
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed: locationProvider.isTracking
-                                ? null
-                                : () {
-                                    if (selectedSchedule != null) {
-                                      locationProvider.startTracking(selectedSchedule.id);
-                                    }
-                                  },
-                            icon: const Icon(Icons.play_arrow),
-                            label: const Text('Start Tracking'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppTheme.successGreen,
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                            ),
-                          ),
+                        Text(
+                            '${schedule.startLocation} → ${schedule.endLocation}'),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Scheduled: ${_formatTime(schedule.scheduledTime)}',
+                          style: TextStyle(color: Colors.grey[600]),
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed: _endJourney,
-                            icon: const Icon(Icons.stop),
-                            label: const Text('End Journey'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppTheme.errorRed,
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                            ),
-                          ),
-                        ),
+                        if (schedule.busNumber != null)
+                          Text('Bus: ${schedule.busNumber}'),
                       ],
                     ),
-                    if (currentPosition != null) ...[
-                      const SizedBox(height: 12),
-                      Text(
-                        'Current Location: ${currentPosition.latitude.toStringAsFixed(6)}, ${currentPosition.longitude.toStringAsFixed(6)}',
-                        style: Theme.of(context).textTheme.bodySmall,
-                        textAlign: TextAlign.center,
+                    trailing: ElevatedButton(
+                      onPressed: () => _startJourney(schedule),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.successGreen,
                       ),
-                      Text(
-                        'Speed: ${currentPosition.speed.toStringAsFixed(1)} m/s | Accuracy: ${currentPosition.accuracy.toStringAsFixed(1)}m',
-                        style: Theme.of(context).textTheme.bodySmall,
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            ],
+                      child: const Text('Start'),
+                    ),
+                    isThreeLine: true,
+                  ),
+                );
+              },
+            ),
           );
         },
       ),
     );
   }
 
-  @override
-  void dispose() {
-    _mapController?.dispose();
-    super.dispose();
+  String _formatTime(DateTime dateTime) {
+    return '${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
   }
 }

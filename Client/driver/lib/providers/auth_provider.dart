@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import '../config/api_endpoints.dart';
+import '../config/api.endpoints.dart';
 import '../models/driver.dart';
 import '../services/api_service.dart';
 import '../utils/shared_prefs.dart';
@@ -13,6 +13,7 @@ class AuthProvider extends ChangeNotifier {
   Driver? get driver => _driver;
   bool get isLoading => _isLoading;
   String? get error => _error;
+  bool get isAuthenticated => _driver != null;
 
   Future<bool> login(String email, String password) async {
     _setLoading(true);
@@ -26,12 +27,12 @@ class AuthProvider extends ChangeNotifier {
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        final token = data['token'];
-        final driverData = data['driver'];
+        final token = data['data']['tokens']['accessToken'];
+        final driverData = data['data']['driver'];
 
         await SharedPrefs.setToken(token);
         await SharedPrefs.setDriverId(driverData['id']);
-        
+
         _driver = Driver.fromJson(driverData);
         _setLoading(false);
         return true;
@@ -48,30 +49,44 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  Future<bool> register(String email, String password, String name, String phone, String licenseNumber) async {
+  Future<bool> register(String email, String password, String name,
+      String phone, String licenseNumber) async {
     _setLoading(true);
     _error = null;
 
     try {
+      // Split name into first and last name
+      final nameParts = name.trim().split(' ');
+      final firstName = nameParts.first;
+      final lastName =
+          nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '';
+
       final response = await ApiService.post(
         ApiEndpoints.driverRegister,
         {
+          'firstName': firstName,
+          'lastName': lastName,
           'email': email,
           'password': password,
-          'name': name,
           'phone': phone,
           'licenseNumber': licenseNumber,
+          'licenseExpiry': DateTime.now()
+              .add(Duration(days: 365 * 5))
+              .toIso8601String(), // 5 years from now
+          'vehicleNumber':
+              'TMP-${DateTime.now().millisecondsSinceEpoch.toString().substring(8)}', // Temporary vehicle number
+          'vehicleType': 'bus',
         },
       );
 
       if (response.statusCode == 201) {
         final data = json.decode(response.body);
-        final token = data['token'];
-        final driverData = data['driver'];
+        final token = data['data']['tokens']['accessToken'];
+        final driverData = data['data']['driver'];
 
         await SharedPrefs.setToken(token);
         await SharedPrefs.setDriverId(driverData['id']);
-        
+
         _driver = Driver.fromJson(driverData);
         _setLoading(false);
         return true;
@@ -94,7 +109,7 @@ class AuthProvider extends ChangeNotifier {
     } catch (e) {
       // Ignore logout errors
     }
-    
+
     await SharedPrefs.clearAll();
     _driver = null;
     notifyListeners();

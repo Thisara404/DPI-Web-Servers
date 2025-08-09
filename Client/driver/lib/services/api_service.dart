@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import '../config/api_endpoints.dart';
+import '../config/api.endpoints.dart';
 import '../utils/shared_prefs.dart';
 
 class ApiService {

@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import '../config/api_endpoints.dart';
+import '../config/api.endpoints.dart';
 import '../models/journey.dart';
 import '../services/api_service.dart';
 
@@ -12,7 +12,9 @@ class JourneyProvider extends ChangeNotifier {
   Journey? get currentJourney => _currentJourney;
   bool get isLoading => _isLoading;
   String? get error => _error;
-  bool get isJourneyActive => _currentJourney?.status == 'active';
+  bool get isJourneyActive =>
+      _currentJourney?.status == 'active' ||
+      _currentJourney?.status == 'started';
 
   Future<bool> startJourney(String scheduleId) async {
     _setLoading(true);
@@ -26,7 +28,16 @@ class JourneyProvider extends ChangeNotifier {
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        _currentJourney = Journey.fromJson(data['journey']);
+
+        // Create a journey object from the response
+        _currentJourney = Journey(
+          id: data['data']['journeyId'] ?? scheduleId,
+          scheduleId: scheduleId,
+          driverId: data['data']['driverId'] ?? '',
+          status: 'started',
+          startTime: DateTime.now(),
+        );
+
         _setLoading(false);
         return true;
       } else {
@@ -49,9 +60,10 @@ class JourneyProvider extends ChangeNotifier {
     _error = null;
 
     try {
-      final response = await ApiService.put(
-        ApiEndpoints.journeyById(_currentJourney!.id),
-        {'status': 'completed'},
+      // Use tracking stop endpoint to end journey
+      final response = await ApiService.post(
+        ApiEndpoints.trackingStop,
+        {'scheduleId': _currentJourney!.scheduleId},
       );
 
       if (response.statusCode == 200) {

@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import '../config/api_endpoints.dart';
+import '../config/api.endpoints.dart';
 import '../models/schedule.dart';
 import '../services/api_service.dart';
 
@@ -24,7 +24,20 @@ class ScheduleProvider extends ChangeNotifier {
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        _schedules = (data['schedules'] as List)
+
+        // Handle both formats: direct array or nested in 'data'
+        List schedulesJson;
+        if (data is List) {
+          schedulesJson = data;
+        } else if (data['data'] != null) {
+          schedulesJson = data['data'] as List;
+        } else if (data['schedules'] != null) {
+          schedulesJson = data['schedules'] as List;
+        } else {
+          schedulesJson = [];
+        }
+
+        _schedules = schedulesJson
             .map((schedule) => Schedule.fromJson(schedule))
             .toList();
         _setLoading(false);

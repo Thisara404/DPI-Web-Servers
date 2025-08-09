@@ -72,18 +72,19 @@ class _LoginScreenState extends State<LoginScreen> {
                     const SizedBox(height: 16),
                     Text(
                       'Bus Driver App',
-                      style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-                        fontSize: 32,
-                        color: AppTheme.textPrimary,
-                      ),
+                      style:
+                          Theme.of(context).textTheme.headlineLarge?.copyWith(
+                                fontSize: 32,
+                                color: AppTheme.textPrimary,
+                              ),
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 8),
                     Text(
                       'Welcome back, driver!',
                       style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                        color: AppTheme.textSecondary,
-                      ),
+                            color: AppTheme.textSecondary,
+                          ),
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 48),
@@ -100,7 +101,8 @@ class _LoginScreenState extends State<LoginScreen> {
                         if (value?.isEmpty ?? true) {
                           return 'Please enter your email';
                         }
-                        if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}).hasMatch(value!)) {
+                        if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
+                            .hasMatch(value!)) {
                           return 'Please enter a valid email';
                         }
                         return null;
@@ -116,7 +118,9 @@ class _LoginScreenState extends State<LoginScreen> {
                         labelText: 'Password',
                         prefixIcon: const Icon(Icons.lock),
                         suffixIcon: IconButton(
-                          icon: Icon(_obscurePassword ? Icons.visibility : Icons.visibility_off),
+                          icon: Icon(_obscurePassword
+                              ? Icons.visibility
+                              : Icons.visibility_off),
                           onPressed: () {
                             setState(() {
                               _obscurePassword = !_obscurePassword;
@@ -150,10 +154,12 @@ class _LoginScreenState extends State<LoginScreen> {
                       onPressed: () {
                         Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (context) => const RegisterScreen()),
+                          MaterialPageRoute(
+                              builder: (context) => const RegisterScreen()),
                         );
                       },
-                      child: const Text('Don\'t have an account? Register here'),
+                      child:
+                          const Text('Don\'t have an account? Register here'),
                     ),
                   ],
                 ),
