@@ -81,7 +81,8 @@ app.get('/health/all', async (req, res) => {
       gateway: { status: 'healthy', port: PORT },
       sludi: { url: 'http://localhost:3001/health', status: 'unknown' },
       ndx: { url: 'http://localhost:3002/health', status: 'unknown' },
-      paydpi: { url: 'http://localhost:3003/health', status: 'unknown' }
+      paydpi: { url: 'http://localhost:3003/health', status: 'unknown' },
+      driver: { url: 'http://localhost:4001/health', status: 'unknown' }
     };
 
     // Check each service
@@ -215,6 +216,9 @@ app.use('/api/schedules', createProxy('http://localhost:3002'));
 app.use('/api/payments', createProxy('http://localhost:3003'));
 app.use('/api/subsidies', createProxy('http://localhost:3003'));
 
+// Driver API Routes (add after PayDPI routes)
+app.use('/api/driver', createProxy('http://localhost:4001'));
+
 // OAuth callback for frontend apps (keeping your existing functionality)
 app.get('/callback', (req, res) => {
   const { code, state, error, error_description } = req.query;
@@ -308,6 +312,13 @@ app.get('/api/services', (req, res) => {
         port: 3003,
         status: 'active',
         routes: ['/api/payments/*', '/api/subsidies/*']
+      },
+      {
+        name: 'Driver API',
+        description: 'Driver Management and Tracking',
+        port: 4001,
+        status: 'active',
+        routes: ['/api/driver/*']
       }
     ]
   });
@@ -365,6 +376,7 @@ app.listen(PORT, () => {
   console.log('   /api/schedules/* → NDX (3002)');
   console.log('   /api/payments/* → PayDPI (3003)');
   console.log('   /api/subsidies/* → PayDPI (3003)');
+  console.log('   /api/driver/*   → Driver API (4001)');
   console.log('🌐 =====================================');
   console.log('🎯 Ready for frontend connections!');
   console.log('🌐 =====================================\n');
