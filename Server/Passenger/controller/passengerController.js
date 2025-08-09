@@ -1,28 +1,42 @@
 const Passenger = require('../model/Passenger');
 const analyticsService = require('../services/analyticsService');
 const realTimeTrackingService = require('../services/realTimeTrackingService');
-const notificationService = require('../services/notificationService');
+// COMMENTED OUT - Will implement later
+// const notificationService = require('../services/notificationService');
 
 class PassengerController {
   // Get passenger dashboard
   static async getDashboard(req, res) {
     try {
       const passenger = req.passenger;
-      
+
       console.log(`📊 Getting dashboard for passenger: ${passenger.citizenId}`);
 
+      // Get analytics data
       const dashboardData = await analyticsService.getPassengerDashboard(passenger.citizenId);
 
       res.json({
         success: true,
-        data: dashboardData
+        data: {
+          passenger: {
+            id: passenger._id,
+            citizenId: passenger.citizenId,
+            firstName: passenger.firstName,
+            lastName: passenger.lastName,
+            email: passenger.email,
+            isVerified: passenger.isVerified,
+            totalJourneys: passenger.totalJourneys,
+            totalSpent: passenger.totalSpent
+          },
+          ...dashboardData
+        }
       });
 
     } catch (error) {
       console.error('Get dashboard error:', error);
       res.status(500).json({
         success: false,
-        message: 'Failed to get dashboard data',
+        message: 'Failed to get dashboard',
         error: error.message
       });
     }
@@ -32,21 +46,18 @@ class PassengerController {
   static async getTravelHistory(req, res) {
     try {
       const passenger = req.passenger;
-      const { page, limit, startDate, endDate, routeId } = req.query;
+      const { page = 1, limit = 10, startDate, endDate } = req.query;
 
       console.log(`📚 Getting travel history for passenger: ${passenger.citizenId}`);
 
-      const historyData = await analyticsService.getTravelHistory(passenger.citizenId, {
-        page: parseInt(page) || 1,
-        limit: parseInt(limit) || 20,
-        startDate,
-        endDate,
-        routeId
-      });
+      const travelHistory = await analyticsService.getTravelHistory(
+        passenger.citizenId,
+        { page, limit, startDate, endDate }
+      );
 
       res.json({
         success: true,
-        data: historyData
+        data: travelHistory
       });
 
     } catch (error) {
@@ -121,38 +132,30 @@ class PassengerController {
     try {
       const passenger = req.passenger;
 
+      console.log(`⭐ Getting favorite routes for passenger: ${passenger.citizenId}`);
+
       const favoriteRoutes = passenger.preferences?.favoriteRoutes || [];
 
-      // Enhance with current schedule data
+      // Enhance with current schedules if available
       const enhancedFavorites = await Promise.all(
         favoriteRoutes.map(async (favorite) => {
           try {
+            // Get current schedules for this route from NDX
             const apiGateway = require('../config/apiGateway');
-            
-            // Get active schedules for this route
             const schedulesResponse = await apiGateway.getSchedulesFromNDX({
               routeId: favorite.routeId,
               status: 'active,scheduled',
-              limit: 3
+              limit: 5
             });
 
-            const activeSchedules = schedulesResponse.success ? schedulesResponse.data : [];
-
             return {
               ...favorite,
-              activeSchedules: activeSchedules.map(schedule => ({
-                scheduleId: schedule._id,
-                departureTime: schedule.departureTime,
-                status: schedule.status,
-                availableSeats: schedule.capacity - (schedule.currentPassengers || 0)
-              }))
+              currentSchedules: schedulesResponse.success ? schedulesResponse.data : []
             };
-
           } catch (error) {
-            console.warn(`Error fetching schedules for route ${favorite.routeId}:`, error.message);
             return {
               ...favorite,
-              activeSchedules: []
+              currentSchedules: []
             };
           }
         })
@@ -162,7 +165,7 @@ class PassengerController {
         success: true,
         data: {
           favoriteRoutes: enhancedFavorites,
-          total: enhancedFavorites.length
+          total: favoriteRoutes.length
         }
       });
 
@@ -182,26 +185,17 @@ class PassengerController {
       const passenger = req.passenger;
       const { routeId, routeName } = req.body;
 
-      if (!routeId || !routeName) {
-        return res.status(400).json({
-          success: false,
-          message: 'Route ID and name are required'
-        });
-      }
+      console.log(`⭐ Adding route to favorites: ${routeId} for passenger: ${passenger.citizenId}`);
 
-      const favoriteData = {
-        routeId,
-        routeName,
-        addedAt: new Date()
-      };
-
-      await passenger.addToFavorites(favoriteData);
+      await passenger.addToFavorites(routeId, routeName);
 
       res.json({
         success: true,
-        message: 'Route added to favorites',
+        message: 'Route added to favorites successfully',
         data: {
-          favoriteRoutes: passenger.preferences.favoriteRoutes
+          routeId,
+          routeName,
+          addedAt: new Date()
         }
       });
 
@@ -221,13 +215,15 @@ class PassengerController {
       const passenger = req.passenger;
       const { routeId } = req.params;
 
+      console.log(`❌ Removing route from favorites: ${routeId} for passenger: ${passenger.citizenId}`);
+
       await passenger.removeFromFavorites(routeId);
 
       res.json({
         success: true,
-        message: 'Route removed from favorites',
+        message: 'Route removed from favorites successfully',
         data: {
-          favoriteRoutes: passenger.preferences.favoriteRoutes
+          routeId
         }
       });
 
@@ -311,17 +307,7 @@ class PassengerController {
 
       const status = await realTimeTrackingService.getScheduleStatus(scheduleId);
 
-      if (status.success) {
-        res.json({
-          success: true,
-          data: status.data
-        });
-      } else {
-        res.status(404).json({
-          success: false,
-          message: status.message
-        });
-      }
+      res.json(status);
 
     } catch (error) {
       console.error('Get schedule status error:', error);
@@ -351,21 +337,10 @@ class PassengerController {
         lng: parseFloat(lng)
       });
 
-      if (eta) {
-        res.json({
-          success: true,
-          data: {
-            scheduleId,
-            passengerLocation: { lat: parseFloat(lat), lng: parseFloat(lng) },
-            ...eta
-          }
-        });
-      } else {
-        res.status(404).json({
-          success: false,
-          message: 'Unable to calculate ETA - schedule not found or not active'
-        });
-      }
+      res.json({
+        success: true,
+        data: eta
+      });
 
     } catch (error) {
       console.error('Calculate ETA error:', error);

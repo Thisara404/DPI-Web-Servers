@@ -1,8 +1,9 @@
 const apiGateway = require('../config/apiGateway');
-const Passenger = require('../models/Passenger');
+// Fix: Change from '../models/Passenger' to '../model/Passenger'
+const Passenger = require('../model/Passenger');
 
 class AuthController {
-  // Register new passenger through SLUDI
+  // Register new passenger directly (without SLUDI initially)
   static async register(req, res) {
     try {
       const {
@@ -15,61 +16,78 @@ class AuthController {
         address
       } = req.body;
 
-      console.log('📝 Registering passenger through SLUDI...');
+      console.log(`📝 Registering new passenger: ${email}`);
 
-      // Register with SLUDI first
-      const sludiResponse = await apiGateway.registerWithSLUDI({
+      // Check if passenger already exists
+      const existingPassenger = await Passenger.findOne({
+        $or: [{ email }, { phone: phoneNumber }]
+      });
+
+      if (existingPassenger) {
+        return res.status(400).json({
+          success: false,
+          message: 'Passenger with this email or phone number already exists'
+        });
+      }
+
+      // Generate temporary passenger ID (until SLUDI validation)
+      const tempPassengerId = `TEMP_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+
+      // Create passenger record directly
+      const passenger = new Passenger({
+        citizenId: tempPassengerId, // Temporary until SLUDI validation
         firstName,
         lastName,
         email,
-        phoneNumber,
-        password,
-        dateOfBirth,
-        address
+        phone: phoneNumber,
+        dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : null,
+        address: address || {},
+        isVerified: false, // Will be true after SLUDI validation
+        status: 'pending_verification', // Status until SLUDI validation
+        // Store password temporarily for SLUDI registration later
+        tempPassword: password,
+        registrationMethod: 'direct'
       });
 
-      if (sludiResponse.success && sludiResponse.data.citizen) {
-        const citizenData = sludiResponse.data.citizen;
-        
-        // Create passenger record
-        const passenger = new Passenger({
-          citizenId: citizenData.citizenId,
-          firstName: citizenData.firstName,
-          lastName: citizenData.lastName,
-          email: citizenData.email,
-          phone: citizenData.phoneNumber || phoneNumber,
-          dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : null,
-          address: address || {},
-          isVerified: citizenData.isVerified || false
-        });
+      await passenger.save();
 
-        await passenger.save();
+      // Generate a simple JWT token for temporary access
+      const jwt = require('jsonwebtoken');
+      const tempToken = jwt.sign(
+        {
+          passengerId: passenger._id,
+          citizenId: tempPassengerId,
+          email: passenger.email,
+          type: 'temp_access'
+        },
+        process.env.JWT_SECRET,
+        { expiresIn: '7d' }
+      );
 
-        res.status(201).json({
-          success: true,
-          message: 'Passenger registered successfully',
-          data: {
-            passenger: {
-              id: passenger._id,
-              citizenId: passenger.citizenId,
-              firstName: passenger.firstName,
-              lastName: passenger.lastName,
-              email: passenger.email,
-              phone: passenger.phone,
-              isVerified: passenger.isVerified,
-              status: passenger.status
-            },
-            tokens: sludiResponse.data.tokens
+      res.status(201).json({
+        success: true,
+        message: 'Passenger registered successfully. Please verify with your Citizen ID to complete registration.',
+        data: {
+          passenger: {
+            id: passenger._id,
+            citizenId: passenger.citizenId,
+            firstName: passenger.firstName,
+            lastName: passenger.lastName,
+            email: passenger.email,
+            phone: passenger.phone,
+            isVerified: passenger.isVerified,
+            status: passenger.status,
+            requiresCitizenVerification: true
+          },
+          tokens: {
+            accessToken: tempToken,
+            tokenType: 'temporary',
+            expiresIn: '7d'
           }
-        });
+        }
+      });
 
-        console.log(`✅ Passenger registered: ${passenger.citizenId}`);
-      } else {
-        return res.status(400).json({
-          success: false,
-          message: sludiResponse.message || 'Registration failed with SLUDI'
-        });
-      }
+      console.log(`✅ Passenger registered (pending verification): ${passenger.email}`);
     } catch (error) {
       console.error('Registration error:', error);
       res.status(500).json({
@@ -80,44 +98,50 @@ class AuthController {
     }
   }
 
-  // Login passenger through SLUDI
-  static async login(req, res) {
+  // Verify passenger with SLUDI using Citizen ID
+  static async verifyCitizenId(req, res) {
     try {
-      const { email, password } = req.body;
+      const passenger = req.passenger;
+      const { citizenId, password } = req.body;
 
-      console.log(`🔐 Logging in passenger: ${email}`);
+      if (!citizenId || !password) {
+        return res.status(400).json({
+          success: false,
+          message: 'Citizen ID and password are required'
+        });
+      }
 
-      // Login with SLUDI
+      console.log(`🔍 Verifying citizen ID: ${citizenId} for passenger: ${passenger.email}`);
+
+      // Register/Login with SLUDI using citizen credentials
       const sludiResponse = await apiGateway.loginWithSLUDI({
-        email,
-        password
+        email: passenger.email,
+        password: password
       });
 
       if (sludiResponse.success && sludiResponse.data.citizen) {
         const citizenData = sludiResponse.data.citizen;
-        
-        // Find or create passenger record
-        let passenger = await Passenger.findOne({ citizenId: citizenData.citizenId });
-        
-        if (!passenger) {
-          // Create passenger record if not exists
-          passenger = new Passenger({
-            citizenId: citizenData.citizenId,
-            firstName: citizenData.firstName,
-            lastName: citizenData.lastName,
-            email: citizenData.email,
-            phone: citizenData.phoneNumber || '',
-            isVerified: citizenData.isVerified || false
+
+        // Verify the citizen ID matches
+        if (citizenData.citizenId !== citizenId) {
+          return res.status(400).json({
+            success: false,
+            message: 'Citizen ID does not match the provided credentials'
           });
-          await passenger.save();
         }
 
-        // Update last login
-        await passenger.updateLastLogin();
+        // Update passenger with verified citizen data
+        passenger.citizenId = citizenData.citizenId;
+        passenger.isVerified = true;
+        passenger.status = 'active';
+        passenger.tempPassword = undefined; // Remove temporary password
+        passenger.lastLogin = new Date();
+
+        await passenger.save();
 
         res.json({
           success: true,
-          message: 'Login successful',
+          message: 'Citizen ID verified successfully',
           data: {
             passenger: {
               id: passenger._id,
@@ -135,13 +159,122 @@ class AuthController {
           }
         });
 
-        console.log(`✅ Passenger logged in: ${passenger.citizenId}`);
+        console.log(`✅ Passenger verified with SLUDI: ${passenger.citizenId}`);
       } else {
         return res.status(401).json({
           success: false,
-          message: sludiResponse.message || 'Invalid credentials'
+          message: 'Invalid citizen credentials'
         });
       }
+    } catch (error) {
+      console.error('Citizen verification error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Citizen verification failed',
+        error: error.message
+      });
+    }
+  }
+
+  // Login passenger (works for both verified and unverified)
+  static async login(req, res) {
+    try {
+      const { email, password } = req.body;
+
+      console.log(`🔐 Logging in passenger: ${email}`);
+
+      // Find passenger by email
+      const passenger = await Passenger.findOne({ email });
+
+      if (!passenger) {
+        return res.status(401).json({
+          success: false,
+          message: 'Invalid email or password'
+        });
+      }
+
+      // If passenger is verified, use SLUDI login
+      if (passenger.isVerified && passenger.citizenId && !passenger.citizenId.startsWith('TEMP_')) {
+        const sludiResponse = await apiGateway.loginWithSLUDI({
+          email,
+          password
+        });
+
+        if (sludiResponse.success && sludiResponse.data.citizen) {
+          // Update last login
+          await passenger.updateLastLogin();
+
+          res.json({
+            success: true,
+            message: 'Login successful',
+            data: {
+              passenger: {
+                id: passenger._id,
+                citizenId: passenger.citizenId,
+                firstName: passenger.firstName,
+                lastName: passenger.lastName,
+                email: passenger.email,
+                phone: passenger.phone,
+                isVerified: passenger.isVerified,
+                status: passenger.status,
+                preferences: passenger.preferences,
+                totalJourneys: passenger.totalJourneys
+              },
+              tokens: sludiResponse.data.tokens
+            }
+          });
+        } else {
+          return res.status(401).json({
+            success: false,
+            message: 'Invalid credentials'
+          });
+        }
+      } else {
+        // For unverified passengers, use temporary password
+        if (passenger.tempPassword === password) {
+          const jwt = require('jsonwebtoken');
+          const tempToken = jwt.sign(
+            {
+              passengerId: passenger._id,
+              citizenId: passenger.citizenId,
+              email: passenger.email,
+              type: 'temp_access'
+            },
+            process.env.JWT_SECRET,
+            { expiresIn: '7d' }
+          );
+
+          res.json({
+            success: true,
+            message: 'Login successful. Please verify your Citizen ID to access full features.',
+            data: {
+              passenger: {
+                id: passenger._id,
+                citizenId: passenger.citizenId,
+                firstName: passenger.firstName,
+                lastName: passenger.lastName,
+                email: passenger.email,
+                phone: passenger.phone,
+                isVerified: passenger.isVerified,
+                status: passenger.status,
+                requiresCitizenVerification: true
+              },
+              tokens: {
+                accessToken: tempToken,
+                tokenType: 'temporary',
+                expiresIn: '7d'
+              }
+            }
+          });
+        } else {
+          return res.status(401).json({
+            success: false,
+            message: 'Invalid credentials'
+          });
+        }
+      }
+
+      console.log(`✅ Passenger logged in: ${passenger.email}`);
     } catch (error) {
       console.error('Login error:', error);
       res.status(500).json({
@@ -176,7 +309,8 @@ class AuthController {
             totalJourneys: passenger.totalJourneys,
             totalSpent: passenger.totalSpent,
             lastLogin: passenger.lastLogin,
-            createdAt: passenger.createdAt
+            createdAt: passenger.createdAt,
+            requiresCitizenVerification: !passenger.isVerified
           }
         }
       });

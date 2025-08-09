@@ -1,6 +1,7 @@
 const express = require("express");
 const { body } = require("express-validator");
-const TicketController = require("../controllers/ticketController");
+// Fix: Change from 'controllers' to 'controller'
+const TicketController = require("../controller/ticketController");
 const { verifyToken, requireActiveAccount } = require("../middleware/auth");
 const { handleValidationErrors } = require("../middleware/validation");
 

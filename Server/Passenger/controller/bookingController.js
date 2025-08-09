@@ -49,9 +49,7 @@ class BookingController {
 
       // Calculate pricing
       const baseFare = routeDetails.distance
-        ? Math.round(
-            routeDetails.distance * (schedule.routeId?.costPerKm || 2.5)
-          )
+        ? Math.round(routeDetails.distance * (schedule.routeId?.costPerKm || 2.5))
         : 50;
 
       let totalAmount = baseFare;

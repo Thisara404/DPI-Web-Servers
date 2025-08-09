@@ -11,10 +11,6 @@ const http = require('http');
 const socketService = require('./services/socketService');
 const path = require('path');
 
-// Import new services
-const notificationService = require('./services/notificationService');
-const realTimeTrackingService = require('./services/realTimeTrackingService');
-
 // Import routes
 const authRoutes = require('./routes/auth');
 const scheduleRoutes = require('./routes/schedules');
@@ -22,6 +18,11 @@ const mapRoutes = require('./routes/map');
 const bookingRoutes = require('./routes/bookings');
 const ticketRoutes = require('./routes/tickets');
 const passengerRoutes = require('./routes/passenger');
+
+// Import new services
+// COMMENTED OUT - Will implement later
+// const notificationService = require('./services/notificationService');
+const realTimeTrackingService = require('./services/realTimeTrackingService');
 
 const app = express();
 const PORT = process.env.PORT || 4002;
@@ -82,8 +83,8 @@ const server = http.createServer(app);
 // Initialize Socket.IO
 socketService.initialize(server);
 
-// Start notification service
-notificationService.startNotificationProcessor();
+// Start notification service - COMMENTED OUT
+// notificationService.startNotificationProcessor();
 
 // Start real-time tracking service
 realTimeTrackingService.start();
@@ -177,9 +178,9 @@ app.get('/api/docs', (req, res) => {
         'GET /api/passenger/tracking/:scheduleId/status': 'Get real-time bus status',
         'GET /api/passenger/tracking/:scheduleId/eta': 'Calculate ETA to passenger location'
       },
-      notifications: {
-        'WebSocket Events': 'notification, eta-update, route-disruption, system-announcement'
-      },
+      // notifications: {
+      //   'WebSocket Events': 'notification, eta-update, route-disruption, system-announcement'
+      // },
       analytics: {
         'Dashboard': 'Travel stats, spending analytics, route usage, carbon footprint',
         'History': 'Filtered travel history with summary statistics',
@@ -188,8 +189,8 @@ app.get('/api/docs', (req, res) => {
     },
     features: {
       realTimeTracking: 'Live bus location updates with ETA calculations',
-      notifications: 'Email, SMS, and push notifications for arrivals and updates',
-      analytics: 'Insights into travel patterns, expenses, and environmental impact'
+      // notifications: 'Email, SMS, and push notifications for arrivals and updates',
+      analytics: 'Dashboard analytics for travel behavior and preferences'
     }
   });
 });
@@ -256,7 +257,7 @@ process.on('SIGTERM', () => {
   console.log('🛑 SIGTERM received, shutting down gracefully...');
   
   // Stop services
-  notificationService.stopNotificationProcessor();
+  // notificationService.stopNotificationProcessor(); // COMMENTED OUT
   realTimeTrackingService.stop();
   
   // Close server

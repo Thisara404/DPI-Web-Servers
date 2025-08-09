@@ -1,6 +1,7 @@
 const express = require('express');
 const { body } = require('express-validator');
-const PassengerController = require('../controllers/passengerController');
+// Fix: Change from 'controllers' to 'controller'
+const PassengerController = require('../controller/passengerController');
 const { verifyToken, requireActiveAccount } = require('../middleware/auth');
 const { handleValidationErrors } = require('../middleware/validation');
 
@@ -23,7 +24,7 @@ const updatePreferencesValidation = [
 
 const addToFavoritesValidation = [
   body('routeId').notEmpty().withMessage('Route ID is required'),
-  body('routeName').notEmpty().withMessage('Route name is required'),
+  body('routeName').optional().trim().isLength({ min: 2 }).withMessage('Route name must be at least 2 characters'),
   handleValidationErrors
 ];
 
@@ -32,19 +33,19 @@ const subscribeTrackingValidation = [
   handleValidationErrors
 ];
 
-// Dashboard and analytics routes
+// Passenger dashboard and analytics
 router.get('/dashboard', PassengerController.getDashboard);
 router.get('/history', PassengerController.getTravelHistory);
 
-// Preferences routes
+// Preferences management
 router.put('/preferences', updatePreferencesValidation, PassengerController.updatePreferences);
 
-// Favorites routes
+// Favorite routes management
 router.get('/favorites', PassengerController.getFavoriteRoutes);
 router.post('/favorites', addToFavoritesValidation, PassengerController.addToFavorites);
 router.delete('/favorites/:routeId', PassengerController.removeFromFavorites);
 
-// Real-time tracking routes
+// Real-time tracking
 router.post('/tracking/subscribe', subscribeTrackingValidation, PassengerController.subscribeToTracking);
 router.delete('/tracking/:scheduleId', PassengerController.unsubscribeFromTracking);
 router.get('/tracking/:scheduleId/status', PassengerController.getScheduleStatus);

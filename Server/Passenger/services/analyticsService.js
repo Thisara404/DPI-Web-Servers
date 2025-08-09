@@ -1,6 +1,6 @@
-const Booking = require('../models/Booking');
-const Ticket = require('../models/Ticket');
-const Passenger = require('../models/Passenger');
+const Booking = require('../model/Booking');
+const Ticket = require('../model/Ticket');
+const Passenger = require('../model/Passenger');
 
 class AnalyticsService {
   // Get passenger dashboard analytics
