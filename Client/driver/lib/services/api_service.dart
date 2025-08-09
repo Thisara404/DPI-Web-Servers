@@ -17,16 +17,27 @@ class ApiService {
     return http.get(Uri.parse(endpoint), headers: headers);
   }
 
-  static Future<http.Response> post(String endpoint, Map<String, dynamic> data) async {
+  static Future<http.Response> post(
+      String endpoint, Map<String, dynamic> data) async {
     final headers = await _getHeaders();
-    return http.post(
+
+    print('🔄 POST Request to: $endpoint');
+    print('📤 Request Data: ${json.encode(data)}');
+
+    final response = await http.post(
       Uri.parse(endpoint),
       headers: headers,
       body: json.encode(data),
     );
+
+    print('📥 Response Status: ${response.statusCode}');
+    print('📥 Response Body: ${response.body}');
+
+    return response;
   }
 
-  static Future<http.Response> put(String endpoint, Map<String, dynamic> data) async {
+  static Future<http.Response> put(
+      String endpoint, Map<String, dynamic> data) async {
     final headers = await _getHeaders();
     return http.put(
       Uri.parse(endpoint),

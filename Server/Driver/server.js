@@ -27,6 +27,8 @@ app.use(helmet());
 // CORS Configuration
 app.use(cors({
   origin: process.env.CORS_ORIGIN?.split(',') || [
+    'http://localhost:3000',
+    'http://192.168.43.187:3000',
     'http://localhost:3006',
     'http://192.168.43.187:3006'
   ],

@@ -20,14 +20,15 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      Provider.of<ScheduleProvider>(context, listen: false).fetchActiveSchedules();
+      Provider.of<ScheduleProvider>(context, listen: false)
+          .fetchActiveSchedules();
     });
   }
 
   Future<void> _logout() async {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     await authProvider.logout();
-    
+
     if (mounted) {
       Navigator.pushReplacement(
         context,
@@ -49,7 +50,8 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
       body: Consumer3<AuthProvider, ScheduleProvider, JourneyProvider>(
-        builder: (context, authProvider, scheduleProvider, journeyProvider, child) {
+        builder:
+            (context, authProvider, scheduleProvider, journeyProvider, child) {
           final driver = authProvider.driver;
           final isJourneyActive = journeyProvider.isJourneyActive;
 
@@ -71,7 +73,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               radius: 30,
                               backgroundColor: AppTheme.successGreen,
                               child: Text(
-                                driver?.name.substring(0, 1).toUpperCase() ?? 'D',
+                                driver?.firstInitial ?? 'D',
                                 style: const TextStyle(
                                   fontSize: 24,
                                   fontWeight: FontWeight.bold,
@@ -86,11 +88,14 @@ class _HomeScreenState extends State<HomeScreen> {
                                 children: [
                                   Text(
                                     'Welcome back,',
-                                    style: Theme.of(context).textTheme.bodyMedium,
+                                    style:
+                                        Theme.of(context).textTheme.bodyMedium,
                                   ),
                                   Text(
                                     driver?.name ?? 'Driver',
-                                    style: Theme.of(context).textTheme.headlineMedium,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .headlineMedium,
                                   ),
                                 ],
                               ),
@@ -101,20 +106,26 @@ class _HomeScreenState extends State<HomeScreen> {
                         Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: driver?.isActive == true ? AppTheme.successGreen : AppTheme.warningYellow,
+                            color: driver?.isActive == true
+                                ? AppTheme.successGreen
+                                : AppTheme.warningYellow,
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Icon(
-                                driver?.isActive == true ? Icons.check_circle : Icons.warning,
+                                driver?.isActive == true
+                                    ? Icons.check_circle
+                                    : Icons.warning,
                                 color: Colors.white,
                                 size: 20,
                               ),
                               const SizedBox(width: 8),
                               Text(
-                                driver?.isActive == true ? 'Active Driver' : 'Inactive',
+                                driver?.isActive == true
+                                    ? 'Active Driver'
+                                    : 'Pending Verification',
                                 style: const TextStyle(
                                   color: Colors.white,
                                   fontWeight: FontWeight.bold,
@@ -145,9 +156,12 @@ class _HomeScreenState extends State<HomeScreen> {
                           const SizedBox(height: 12),
                           Text(
                             'Journey in Progress',
-                            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                              color: AppTheme.successGreen,
-                            ),
+                            style: Theme.of(context)
+                                .textTheme
+                                .headlineMedium
+                                ?.copyWith(
+                                  color: AppTheme.successGreen,
+                                ),
                           ),
                           const SizedBox(height: 8),
                           const Text('You are currently on an active journey'),
@@ -156,7 +170,9 @@ class _HomeScreenState extends State<HomeScreen> {
                             onPressed: () {
                               Navigator.push(
                                 context,
-                                MaterialPageRoute(builder: (context) => const JourneyScreen()),
+                                MaterialPageRoute(
+                                    builder: (context) =>
+                                        const JourneyScreen()),
                               );
                             },
                             child: const Text('View Journey'),
@@ -177,12 +193,16 @@ class _HomeScreenState extends State<HomeScreen> {
                         title: 'Select Schedule',
                         subtitle: 'View available schedules',
                         color: AppTheme.warningYellow,
-                        onTap: isJourneyActive ? null : () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (context) => const ScheduleSelectionScreen()),
-                          );
-                        },
+                        onTap: isJourneyActive
+                            ? null
+                            : () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                      builder: (context) =>
+                                          const ScheduleSelectionScreen()),
+                                );
+                              },
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -192,12 +212,16 @@ class _HomeScreenState extends State<HomeScreen> {
                         title: 'Journey Map',
                         subtitle: 'Live tracking view',
                         color: AppTheme.successGreen,
-                        onTap: isJourneyActive ? () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (context) => const JourneyScreen()),
-                          );
-                        } : null,
+                        onTap: isJourneyActive
+                            ? () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                      builder: (context) =>
+                                          const JourneyScreen()),
+                                );
+                              }
+                            : null,
                       ),
                     ),
                   ],
@@ -219,9 +243,12 @@ class _HomeScreenState extends State<HomeScreen> {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceAround,
                           children: [
-                            _StatItem('Available Schedules', '${scheduleProvider.schedules.length}'),
-                            _StatItem('Status', isJourneyActive ? 'Active' : 'Idle'),
-                            _StatItem('License', driver?.licenseNumber ?? 'N/A'),
+                            _StatItem('Available Schedules',
+                                '${scheduleProvider.schedules.length}'),
+                            _StatItem(
+                                'Status', isJourneyActive ? 'Active' : 'Idle'),
+                            _StatItem(
+                                'License', driver?.licenseNumber ?? 'N/A'),
                           ],
                         ),
                       ],
@@ -271,17 +298,17 @@ class _ActionCard extends StatelessWidget {
               Text(
                 title,
                 style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: onTap != null ? null : Colors.grey,
-                ),
+                      fontWeight: FontWeight.bold,
+                      color: onTap != null ? null : Colors.grey,
+                    ),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 4),
               Text(
                 subtitle,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: onTap != null ? null : Colors.grey,
-                ),
+                      color: onTap != null ? null : Colors.grey,
+                    ),
                 textAlign: TextAlign.center,
               ),
             ],
@@ -305,9 +332,9 @@ class _StatItem extends StatelessWidget {
         Text(
           value,
           style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-            color: AppTheme.successGreen,
-            fontWeight: FontWeight.bold,
-          ),
+                color: AppTheme.successGreen,
+                fontWeight: FontWeight.bold,
+              ),
         ),
         const SizedBox(height: 4),
         Text(

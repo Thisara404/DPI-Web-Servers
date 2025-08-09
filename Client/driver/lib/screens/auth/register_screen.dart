@@ -17,10 +17,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
   final _licenseController = TextEditingController();
+  final _vehicleNumberController = TextEditingController(); // Add this
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
+  String _selectedVehicleType = 'bus'; // Add this
 
   @override
   void dispose() {
@@ -28,6 +30,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     _emailController.dispose();
     _phoneController.dispose();
     _licenseController.dispose();
+    _vehicleNumberController.dispose(); // Add this
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
@@ -37,12 +40,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
     if (!_formKey.currentState!.validate()) return;
 
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    final success = await authProvider.register(
+    final success = await authProvider.registerWithVehicle(
+      // Update method name
       _emailController.text.trim(),
       _passwordController.text,
       _nameController.text.trim(),
       _phoneController.text.trim(),
       _licenseController.text.trim(),
+      _vehicleNumberController.text.trim(), // Add this
+      _selectedVehicleType, // Add this
     );
 
     if (success && mounted) {
@@ -130,10 +136,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       decoration: const InputDecoration(
                         labelText: 'Phone Number',
                         prefixIcon: Icon(Icons.phone),
+                        hintText: '0771234567',
                       ),
                       validator: (value) {
                         if (value?.isEmpty ?? true) {
                           return 'Please enter your phone number';
+                        }
+                        if (!RegExp(r'^[0-9]{10}$').hasMatch(value!)) {
+                          return 'Please enter a valid 10-digit phone number';
                         }
                         return null;
                       },
@@ -146,12 +156,57 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       decoration: const InputDecoration(
                         labelText: 'License Number',
                         prefixIcon: Icon(Icons.badge),
+                        hintText: 'DL123456',
                       ),
                       validator: (value) {
                         if (value?.isEmpty ?? true) {
                           return 'Please enter your license number';
                         }
+                        if (value!.length < 5) {
+                          return 'License number must be at least 5 characters';
+                        }
                         return null;
+                      },
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Vehicle Number Field
+                    TextFormField(
+                      controller: _vehicleNumberController,
+                      decoration: const InputDecoration(
+                        labelText: 'Vehicle Number',
+                        prefixIcon: Icon(Icons.directions_bus),
+                        hintText: 'CAR-1234',
+                      ),
+                      validator: (value) {
+                        if (value?.isEmpty ?? true) {
+                          return 'Please enter your vehicle number';
+                        }
+                        if (value!.length < 5) {
+                          return 'Vehicle number must be at least 5 characters';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Vehicle Type Dropdown
+                    DropdownButtonFormField<String>(
+                      value: _selectedVehicleType,
+                      decoration: const InputDecoration(
+                        labelText: 'Vehicle Type',
+                        prefixIcon: Icon(Icons.category),
+                      ),
+                      items: const [
+                        DropdownMenuItem(value: 'bus', child: Text('Bus')),
+                        DropdownMenuItem(value: 'van', child: Text('Van')),
+                        DropdownMenuItem(value: 'car', child: Text('Car')),
+                        DropdownMenuItem(value: 'truck', child: Text('Truck')),
+                      ],
+                      onChanged: (value) {
+                        setState(() {
+                          _selectedVehicleType = value!;
+                        });
                       },
                     ),
                     const SizedBox(height: 16),
@@ -178,8 +233,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         if (value?.isEmpty ?? true) {
                           return 'Please enter a password';
                         }
-                        if (value!.length < 6) {
-                          return 'Password must be at least 6 characters';
+                        if (value!.length < 8) {
+                          return 'Password must be at least 8 characters';
                         }
                         return null;
                       },

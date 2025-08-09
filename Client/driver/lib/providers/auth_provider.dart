@@ -79,7 +79,7 @@ class AuthProvider extends ChangeNotifier {
         },
       );
 
-      if (response.statusCode == 201) {
+      if (response.statusCode == 201 || response.statusCode == 200) {
         final data = json.decode(response.body);
         final token = data['data']['tokens']['accessToken'];
         final driverData = data['data']['driver'];
@@ -93,6 +93,78 @@ class AuthProvider extends ChangeNotifier {
       } else {
         final errorData = json.decode(response.body);
         _error = errorData['message'] ?? 'Registration failed';
+
+        // Handle validation errors specifically
+        if (errorData['errors'] != null) {
+          final errors = errorData['errors'] as List;
+          _error = errors.map((e) => e['msg'] ?? e['message']).join(', ');
+        }
+
+        _setLoading(false);
+        return false;
+      }
+    } catch (e) {
+      _error = 'Network error: ${e.toString()}';
+      _setLoading(false);
+      return false;
+    }
+  }
+
+  Future<bool> registerWithVehicle(
+      String email,
+      String password,
+      String name,
+      String phone,
+      String licenseNumber,
+      String vehicleNumber,
+      String vehicleType) async {
+    _setLoading(true);
+    _error = null;
+
+    try {
+      // Split name into first and last name
+      final nameParts = name.trim().split(' ');
+      final firstName = nameParts.first;
+      final lastName =
+          nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '';
+
+      final response = await ApiService.post(
+        ApiEndpoints.driverRegister,
+        {
+          'firstName': firstName,
+          'lastName': lastName,
+          'email': email,
+          'password': password,
+          'phone': phone,
+          'licenseNumber': licenseNumber,
+          'licenseExpiry':
+              DateTime.now().add(Duration(days: 365 * 5)).toIso8601String(),
+          'vehicleNumber': vehicleNumber,
+          'vehicleType': vehicleType,
+        },
+      );
+
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final token = data['data']['tokens']['accessToken'];
+        final driverData = data['data']['driver'];
+
+        await SharedPrefs.setToken(token);
+        await SharedPrefs.setDriverId(driverData['id']);
+
+        _driver = Driver.fromJson(driverData);
+        _setLoading(false);
+        return true;
+      } else {
+        final errorData = json.decode(response.body);
+        _error = errorData['message'] ?? 'Registration failed';
+
+        // Handle validation errors specifically
+        if (errorData['errors'] != null) {
+          final errors = errorData['errors'] as List;
+          _error = errors.map((e) => e['msg'] ?? e['message']).join(', ');
+        }
+
         _setLoading(false);
         return false;
       }

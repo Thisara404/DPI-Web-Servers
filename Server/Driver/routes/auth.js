@@ -21,10 +21,13 @@ const loginValidation = [
   body('password').notEmpty().withMessage('Password is required')
 ];
 
-// Routes
+// PUBLIC ROUTES (No authentication required)
 router.post('/register', registerValidation, authController.register);
 router.post('/login', loginValidation, authController.login);
-router.post('/logout', authController.logout);
-router.post('/refresh-token', authController.refreshToken);
+
+// PROTECTED ROUTES (Authentication required)
+const { verifyToken } = require('../middleware/auth');
+router.post('/logout', verifyToken, authController.logout);
+router.post('/refresh-token', verifyToken, authController.refreshToken);
 
 module.exports = router;
