@@ -1,5 +1,6 @@
 const express = require("express");
-const ScheduleController = require("../controllers/scheduleController");
+// Fix: Change from 'controllers' to 'controller'
+const ScheduleController = require("../controller/scheduleController");
 const { verifyToken, requireActiveAccount } = require("../middleware/auth");
 
 const router = express.Router();

@@ -58,12 +58,22 @@ const passengerSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['active', 'inactive', 'suspended'],
-    default: 'active'
+    enum: ['active', 'inactive', 'suspended', 'pending_verification'],
+    default: 'pending_verification'
   },
   isVerified: {
     type: Boolean,
     default: false
+  },
+  // Temporary fields for registration flow
+  tempPassword: {
+    type: String,
+    select: false // Don't include in queries by default
+  },
+  registrationMethod: {
+    type: String,
+    enum: ['direct', 'sludi'],
+    default: 'direct'
   },
   verificationCode: String,
   lastLogin: Date,
@@ -91,39 +101,55 @@ passengerSchema.virtual('fullName').get(function() {
   return `${this.firstName} ${this.lastName}`;
 });
 
-// Instance methods
-passengerSchema.methods.addToFavorites = function(routeData) {
-  const existingFavorite = this.preferences.favoriteRoutes.find(
-    route => route.routeId === routeData.routeId
-  );
-  
-  if (!existingFavorite) {
-    this.preferences.favoriteRoutes.push(routeData);
-    return this.save();
-  }
-  return Promise.resolve(this);
-};
-
-passengerSchema.methods.removeFromFavorites = function(routeId) {
-  this.preferences.favoriteRoutes = this.preferences.favoriteRoutes.filter(
-    route => route.routeId !== routeId
-  );
-  return this.save();
-};
-
+// Instance method to update last login
 passengerSchema.methods.updateLastLogin = function() {
   this.lastLogin = new Date();
   return this.save();
 };
 
+// Instance method to add to booking history
 passengerSchema.methods.addToBookingHistory = function(bookingData) {
-  this.bookingHistory.unshift(bookingData);
-  if (this.bookingHistory.length > 50) {
-    this.bookingHistory = this.bookingHistory.slice(0, 50);
-  }
+  this.bookingHistory.push(bookingData);
   this.totalJourneys += 1;
   this.totalSpent += bookingData.amount || 0;
   return this.save();
 };
+
+// Instance method to add to favorites
+passengerSchema.methods.addToFavorites = function(routeId, routeName) {
+  const existingFavorite = this.preferences.favoriteRoutes.find(
+    fav => fav.routeId === routeId
+  );
+  
+  if (!existingFavorite) {
+    this.preferences.favoriteRoutes.push({
+      routeId,
+      routeName,
+      addedAt: new Date()
+    });
+    return this.save();
+  }
+  
+  return Promise.resolve(this);
+};
+
+// Instance method to remove from favorites
+passengerSchema.methods.removeFromFavorites = function(routeId) {
+  this.preferences.favoriteRoutes = this.preferences.favoriteRoutes.filter(
+    fav => fav.routeId !== routeId
+  );
+  return this.save();
+};
+
+// Static method to find by citizen ID
+passengerSchema.statics.findByCitizenId = function(citizenId) {
+  return this.findOne({ citizenId });
+};
+
+// Indexes
+passengerSchema.index({ citizenId: 1 });
+passengerSchema.index({ email: 1 });
+passengerSchema.index({ phone: 1 });
+passengerSchema.index({ status: 1, isVerified: 1 });
 
 module.exports = mongoose.model('Passenger', passengerSchema);

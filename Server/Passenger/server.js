@@ -17,6 +17,12 @@ const scheduleRoutes = require('./routes/schedules');
 const mapRoutes = require('./routes/map');
 const bookingRoutes = require('./routes/bookings');
 const ticketRoutes = require('./routes/tickets');
+const passengerRoutes = require('./routes/passenger');
+
+// Import new services
+// COMMENTED OUT - Will implement later
+// const notificationService = require('./services/notificationService');
+const realTimeTrackingService = require('./services/realTimeTrackingService');
 
 const app = express();
 const PORT = process.env.PORT || 4002;
@@ -77,6 +83,12 @@ const server = http.createServer(app);
 // Initialize Socket.IO
 socketService.initialize(server);
 
+// Start notification service - COMMENTED OUT
+// notificationService.startNotificationProcessor();
+
+// Start real-time tracking service
+realTimeTrackingService.start();
+
 // Health Check
 app.get('/health', (req, res) => {
   const socketStats = socketService.getStats();
@@ -110,6 +122,7 @@ app.use('/api/schedules', scheduleRoutes);
 app.use('/api/map', mapRoutes);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/tickets', ticketRoutes);
+app.use('/api/passenger', passengerRoutes);
 
 // API Documentation
 app.get('/api/docs', (req, res) => {
@@ -153,16 +166,31 @@ app.get('/api/docs', (req, res) => {
         'GET /api/map/stops/nearby': 'Find nearby bus stops',
         'GET /api/map/directions': 'Get route directions'
       },
-      realTime: {
-        'WebSocket Events': 'subscribe-route, subscribe-schedule, live location updates'
+      passenger: {
+        'GET /api/passenger/dashboard': 'Get passenger dashboard with analytics',
+        'GET /api/passenger/history': 'Get travel history with filters',
+        'PUT /api/passenger/preferences': 'Update notification and app preferences',
+        'GET /api/passenger/favorites': 'Get favorite routes with live schedules',
+        'POST /api/passenger/favorites': 'Add route to favorites',
+        'DELETE /api/passenger/favorites/:routeId': 'Remove route from favorites',
+        'POST /api/passenger/tracking/subscribe': 'Subscribe to real-time bus tracking',
+        'DELETE /api/passenger/tracking/:scheduleId': 'Unsubscribe from tracking',
+        'GET /api/passenger/tracking/:scheduleId/status': 'Get real-time bus status',
+        'GET /api/passenger/tracking/:scheduleId/eta': 'Calculate ETA to passenger location'
+      },
+      // notifications: {
+      //   'WebSocket Events': 'notification, eta-update, route-disruption, system-announcement'
+      // },
+      analytics: {
+        'Dashboard': 'Travel stats, spending analytics, route usage, carbon footprint',
+        'History': 'Filtered travel history with summary statistics',
+        'Favorites': 'Route management with live schedule integration'
       }
     },
-    integration: {
-      sludiService: 'Handles authentication through SLUDI server',
-      ndxService: 'Fetches schedules and route data from NDX server',
-      payDPIService: 'Processes payments through PayDPI server',
-      apiGateway: 'Routes requests through DPI API Gateway',
-      socketIO: 'Real-time updates for live bus tracking'
+    features: {
+      realTimeTracking: 'Live bus location updates with ETA calculations',
+      // notifications: 'Email, SMS, and push notifications for arrivals and updates',
+      analytics: 'Dashboard analytics for travel behavior and preferences'
     }
   });
 });
@@ -221,6 +249,21 @@ app.use((err, req, res, next) => {
     success: false,
     message: 'Internal server error',
     error: process.env.NODE_ENV === 'development' ? err.message : 'Something went wrong'
+  });
+});
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+  console.log('🛑 SIGTERM received, shutting down gracefully...');
+  
+  // Stop services
+  // notificationService.stopNotificationProcessor(); // COMMENTED OUT
+  realTimeTrackingService.stop();
+  
+  // Close server
+  server.close(() => {
+    console.log('✅ Server closed');
+    process.exit(0);
   });
 });
 

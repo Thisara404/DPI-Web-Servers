@@ -1,6 +1,7 @@
 const express = require("express");
 const { body } = require("express-validator");
-const BookingController = require("../controllers/bookingController");
+// Fix: Change from 'controllers' to 'controller'
+const BookingController = require("../controller/bookingController");
 const { verifyToken, requireActiveAccount } = require("../middleware/auth");
 const { handleValidationErrors } = require("../middleware/validation");
 

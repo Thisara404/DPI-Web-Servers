@@ -280,6 +280,105 @@ class SocketService {
     }
   }
 
+  // Send notification to specific passenger
+  sendNotificationToPassenger(passengerId, notification) {
+    if (this.io) {
+      this.io.to(`passenger-${passengerId}`).emit("notification", {
+        ...notification,
+        timestamp: new Date().toISOString(),
+        id: Date.now().toString(),
+      });
+
+      console.log(
+        `📱 Notification sent to passenger ${passengerId}:`,
+        notification.title
+      );
+    }
+  }
+
+  // Broadcast system announcement
+  broadcastSystemAnnouncement(announcement) {
+    if (this.io) {
+      this.io.emit("system-announcement", {
+        ...announcement,
+        timestamp: new Date().toISOString(),
+      });
+
+      console.log("📢 System announcement broadcasted:", announcement.title);
+    }
+  }
+
+  // Send route disruption notification
+  broadcastRouteDisruption(routeId, disruptionData) {
+    if (this.io) {
+      this.io.to(`route-${routeId}`).emit("route-disruption", {
+        routeId,
+        ...disruptionData,
+        timestamp: new Date().toISOString(),
+      });
+
+      console.log(`🚧 Route disruption broadcasted for route ${routeId}`);
+    }
+  }
+
+  // Handle passenger location updates for ETA calculations
+  setupPassengerLocationTracking() {
+    this.io.on("connection", (socket) => {
+      // Passenger location update for ETA
+      socket.on("passenger-location-update", async (data) => {
+        const { lat, lng, scheduleId } = data;
+        const passengerId = this.socketToPassenger.get(socket.id);
+
+        if (passengerId && scheduleId && lat && lng) {
+          try {
+            const realTimeTrackingService = require("./realTimeTrackingService");
+            const eta = await realTimeTrackingService.calculateETA(scheduleId, {
+              lat,
+              lng,
+            });
+
+            if (eta) {
+              socket.emit("eta-update", {
+                scheduleId,
+                ...eta,
+                timestamp: new Date().toISOString(),
+              });
+            }
+          } catch (error) {
+            console.error("ETA calculation error:", error);
+          }
+        }
+      });
+
+      // Request notification history
+      socket.on("get-notification-history", async (data) => {
+        const passengerId = this.socketToPassenger.get(socket.id);
+
+        if (passengerId) {
+          // Get recent notifications from database/cache
+          // This would be implemented based on your notification storage strategy
+          socket.emit("notification-history", {
+            notifications: [], // Fetch from storage
+            timestamp: new Date().toISOString(),
+          });
+        }
+      });
+
+      // Mark notification as read
+      socket.on("mark-notification-read", (data) => {
+        const { notificationId } = data;
+        const passengerId = this.socketToPassenger.get(socket.id);
+
+        if (passengerId && notificationId) {
+          // Mark notification as read in storage
+          console.log(
+            `📱 Notification ${notificationId} marked as read by ${passengerId}`
+          );
+        }
+      });
+    });
+  }
+
   // Clean up subscriptions for disconnected socket
   cleanupSocketSubscriptions(socketId) {
     // Clean route subscriptions

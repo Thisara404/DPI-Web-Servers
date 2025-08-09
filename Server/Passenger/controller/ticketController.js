@@ -1,5 +1,5 @@
-const Ticket = require("../models/Ticket");
-const Booking = require("../models/Booking");
+const Ticket = require("../model/Ticket");
+const Booking = require("../model/Booking");
 const qrService = require("../services/qrService");
 
 class TicketController {

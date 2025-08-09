@@ -1,5 +1,6 @@
 const apiGateway = require("../config/apiGateway");
-const Passenger = require("../models/Passenger");
+// Fix: Change from '../models/Passenger' to '../model/Passenger'
+const Passenger = require("../model/Passenger");
 
 class ScheduleController {
   // Get all schedules from NDX
@@ -21,40 +22,17 @@ class ScheduleController {
       const schedulesResponse = await apiGateway.getSchedulesFromNDX(params);
 
       if (schedulesResponse.success) {
-        // Enhance schedules with passenger-specific data
-        const enhancedSchedules = await Promise.all(
-          schedulesResponse.data.map(async (schedule) => {
-            // Calculate estimated fare based on route distance
-            const estimatedFare = schedule.routeId?.distance
-              ? Math.round(
-                  schedule.routeId.distance *
-                    (schedule.routeId.costPerKm || 2.5)
-                )
-              : 50; // Default fare
-
-            // Check if passenger has this route in favorites
-            const isFavorite =
-              req.passenger?.preferences?.favoriteRoutes?.some(
-                (fav) => fav.routeId === schedule.routeId?._id?.toString()
-              ) || false;
-
-            return {
-              ...schedule,
-              estimatedFare,
-              isFavorite,
-              availableSeats:
-                schedule.capacity - (schedule.currentPassengers || 0),
-              departureIn: schedule.departureTime
-                ? Math.max(
-                    0,
-                    Math.floor(
-                      (new Date(schedule.departureTime) - new Date()) / 60000
-                    )
-                  )
-                : null, // Minutes until departure
-            };
-          })
-        );
+        const schedules = schedulesResponse.data || [];
+        
+        // Enhance schedules with passenger-specific information
+        const enhancedSchedules = schedules.map(schedule => ({
+          ...schedule,
+          availableSeats: Math.max(0, (schedule.capacity || 50) - (schedule.currentPassengers || 0)),
+          priceEstimate: schedule.routeId?.distance 
+            ? Math.round(schedule.routeId.distance * (schedule.routeId.costPerKm || 2.5))
+            : 50,
+          isBookable: schedule.status === 'active' || schedule.status === 'scheduled'
+        }));
 
         res.json({
           success: true,
@@ -101,35 +79,23 @@ class ScheduleController {
       const schedulesResponse = await apiGateway.getSchedulesFromNDX(params);
 
       if (schedulesResponse.success) {
-        // Filter schedules that are departing soon or currently active
-        const activeSchedules = schedulesResponse.data.filter((schedule) => {
+        const schedules = schedulesResponse.data || [];
+        
+        // Filter for truly active schedules (departure time in future)
+        const now = new Date();
+        const activeSchedules = schedules.filter(schedule => {
           const departureTime = new Date(schedule.departureTime);
-          const now = new Date();
-          const timeDiff = departureTime - now;
-
-          // Include schedules departing in next 2 hours or currently active
-          return (
-            schedule.status === "active" ||
-            (schedule.status === "scheduled" &&
-              timeDiff > 0 &&
-              timeDiff <= 2 * 60 * 60 * 1000)
-          );
+          return departureTime > now;
         });
 
-        // Enhance with real-time data
-        const enhancedSchedules = activeSchedules.map((schedule) => ({
+        // Enhance with passenger-specific data
+        const enhancedSchedules = activeSchedules.map(schedule => ({
           ...schedule,
-          isLive: schedule.status === "active",
-          departureIn: Math.max(
-            0,
-            Math.floor((new Date(schedule.departureTime) - new Date()) / 60000)
-          ),
-          estimatedFare: schedule.routeId?.distance
-            ? Math.round(
-                schedule.routeId.distance * (schedule.routeId.costPerKm || 2.5)
-              )
-            : 50,
-          availableSeats: schedule.capacity - (schedule.currentPassengers || 0),
+          availableSeats: Math.max(0, (schedule.capacity || 50) - (schedule.currentPassengers || 0)),
+          timeUntilDeparture: Math.max(0, Math.floor((new Date(schedule.departureTime) - now) / 60000)),
+          priceEstimate: schedule.routeId?.distance 
+            ? Math.round(schedule.routeId.distance * (schedule.routeId.costPerKm || 2.5))
+            : 50
         }));
 
         res.json({
@@ -162,14 +128,13 @@ class ScheduleController {
 
       console.log(`📋 Fetching schedule details for: ${id}`);
 
-      // Fetch schedule details from NDX
       const scheduleResponse = await apiGateway.getSchedulesFromNDX({
         scheduleId: id,
       });
 
       if (scheduleResponse.success && scheduleResponse.data.length > 0) {
         const schedule = scheduleResponse.data[0];
-
+        
         // Get route details if available
         let routeDetails = null;
         if (schedule.routeId) {
@@ -177,38 +142,23 @@ class ScheduleController {
             const routeResponse = await apiGateway.getRoutesFromNDX({
               routeId: schedule.routeId._id || schedule.routeId,
             });
-            if (routeResponse.success) {
+            if (routeResponse.success && routeResponse.data.length > 0) {
               routeDetails = routeResponse.data[0];
             }
           } catch (routeError) {
-            console.warn("Could not fetch route details:", routeError.message);
+            console.warn("Failed to fetch route details:", routeError.message);
           }
         }
 
-        // Enhanced schedule with additional passenger-relevant information
         const enhancedSchedule = {
           ...schedule,
-          routeDetails,
-          estimatedFare: routeDetails?.distance
-            ? Math.round(
-                routeDetails.distance * (routeDetails.costPerKm || 2.5)
-              )
+          route: routeDetails,
+          availableSeats: Math.max(0, (schedule.capacity || 50) - (schedule.currentPassengers || 0)),
+          priceEstimate: routeDetails?.distance 
+            ? Math.round(routeDetails.distance * (routeDetails.costPerKm || 2.5))
             : 50,
-          availableSeats: schedule.capacity - (schedule.currentPassengers || 0),
-          departureIn: schedule.departureTime
-            ? Math.max(
-                0,
-                Math.floor(
-                  (new Date(schedule.departureTime) - new Date()) / 60000
-                )
-              )
-            : null,
-          canBook:
-            schedule.status === "scheduled" &&
-            schedule.capacity - (schedule.currentPassengers || 0) > 0,
-          isLive: schedule.status === "active",
-          hasLiveTracking:
-            schedule.status === "active" && schedule.currentLocation,
+          timeUntilDeparture: Math.max(0, Math.floor((new Date(schedule.departureTime) - new Date()) / 60000)),
+          isBookable: schedule.status === 'active' || schedule.status === 'scheduled'
         };
 
         res.json({
@@ -234,111 +184,85 @@ class ScheduleController {
   // Search schedules by criteria
   static async searchSchedules(req, res) {
     try {
-      const {
-        from,
-        to,
-        date,
-        time,
-        maxFare,
-        routeName,
-        limit = 20,
-        page = 1,
+      const { 
+        from, 
+        to, 
+        date, 
+        departureAfter, 
+        departureBefore, 
+        maxPrice,
+        minSeats = 1,
+        limit = 20 
       } = req.query;
 
       console.log("🔍 Searching schedules with criteria:", req.query);
 
       // Build search parameters
-      const searchParams = { limit, page };
+      const params = { limit };
+      if (date) params.date = date;
+      if (departureAfter) params.departureAfter = departureAfter;
+      if (departureBefore) params.departureBefore = departureBefore;
 
-      if (date) searchParams.date = date;
-      if (time) searchParams.time = time;
-      if (routeName) searchParams.routeName = routeName;
-
-      // If from/to coordinates are provided, find relevant routes first
-      if (from && to) {
-        try {
-          const routesResponse = await apiGateway.getRoutesFromNDX({
-            from,
-            to,
-            action: "find-routes",
-          });
-
-          if (
-            routesResponse.success &&
-            routesResponse.data.routes?.length > 0
-          ) {
-            const routeIds = routesResponse.data.routes.map((r) => r.route._id);
-            searchParams.routeIds = routeIds.join(",");
-          }
-        } catch (routeError) {
-          console.warn("Route search failed:", routeError.message);
-        }
-      }
-
-      // Fetch schedules with search criteria
-      const schedulesResponse = await apiGateway.getSchedulesFromNDX(
-        searchParams
-      );
+      const schedulesResponse = await apiGateway.getSchedulesFromNDX(params);
 
       if (schedulesResponse.success) {
-        let schedules = schedulesResponse.data;
+        let schedules = schedulesResponse.data || [];
 
-        // Apply fare filter if provided
-        if (maxFare) {
-          schedules = schedules.filter((schedule) => {
-            const fare = schedule.routeId?.distance
-              ? Math.round(
-                  schedule.routeId.distance *
-                    (schedule.routeId.costPerKm || 2.5)
-                )
-              : 50;
-            return fare <= parseFloat(maxFare);
+        // Filter by location if provided
+        if (from || to) {
+          schedules = schedules.filter(schedule => {
+            const route = schedule.routeId;
+            if (!route) return false;
+
+            let matchesFrom = true;
+            let matchesTo = true;
+
+            if (from) {
+              matchesFrom = route.name?.toLowerCase().includes(from.toLowerCase()) ||
+                           route.startLocation?.toLowerCase().includes(from.toLowerCase());
+            }
+
+            if (to) {
+              matchesTo = route.name?.toLowerCase().includes(to.toLowerCase()) ||
+                         route.endLocation?.toLowerCase().includes(to.toLowerCase());
+            }
+
+            return matchesFrom && matchesTo;
           });
         }
 
-        // Enhance schedules
-        const enhancedSchedules = schedules.map((schedule) => ({
-          ...schedule,
-          estimatedFare: schedule.routeId?.distance
-            ? Math.round(
-                schedule.routeId.distance * (schedule.routeId.costPerKm || 2.5)
-              )
-            : 50,
-          availableSeats: schedule.capacity - (schedule.currentPassengers || 0),
-          departureIn: schedule.departureTime
-            ? Math.max(
-                0,
-                Math.floor(
-                  (new Date(schedule.departureTime) - new Date()) / 60000
-                )
-              )
-            : null,
-          matchRelevance: 100, // Could implement relevance scoring later
-        }));
+        // Filter by available seats
+        schedules = schedules.filter(schedule => {
+          const availableSeats = Math.max(0, (schedule.capacity || 50) - (schedule.currentPassengers || 0));
+          return availableSeats >= parseInt(minSeats);
+        });
 
-        // Sort by departure time
-        enhancedSchedules.sort(
-          (a, b) => new Date(a.departureTime) - new Date(b.departureTime)
-        );
+        // Enhance and filter by price if provided
+        const enhancedSchedules = schedules.map(schedule => {
+          const priceEstimate = schedule.routeId?.distance 
+            ? Math.round(schedule.routeId.distance * (schedule.routeId.costPerKm || 2.5))
+            : 50;
+
+          return {
+            ...schedule,
+            availableSeats: Math.max(0, (schedule.capacity || 50) - (schedule.currentPassengers || 0)),
+            priceEstimate,
+            timeUntilDeparture: Math.max(0, Math.floor((new Date(schedule.departureTime) - new Date()) / 60000))
+          };
+        }).filter(schedule => {
+          return !maxPrice || schedule.priceEstimate <= parseInt(maxPrice);
+        });
 
         res.json({
           success: true,
           data: enhancedSchedules,
           total: enhancedSchedules.length,
-          searchCriteria: {
-            from,
-            to,
-            date,
-            time,
-            maxFare,
-            routeName,
-          },
-          message: `Found ${enhancedSchedules.length} matching schedules`,
+          searchCriteria: req.query
         });
       } else {
         res.status(400).json({
           success: false,
-          message: "Schedule search failed",
+          message: "Failed to search schedules",
           error: schedulesResponse.message,
         });
       }
@@ -388,33 +312,31 @@ class ScheduleController {
         includePath: true,
       });
 
-      if (routeResponse.success) {
-        const routeData = routeResponse.data[0];
+      if (routeResponse.success && routeResponse.data.length > 0) {
+        const route = routeResponse.data[0];
 
         res.json({
           success: true,
           data: {
             schedule: {
               id: schedule._id,
-              status: schedule.status,
               departureTime: schedule.departureTime,
               arrivalTime: schedule.arrivalTime,
+              status: schedule.status,
               currentLocation: schedule.currentLocation,
-              vehicleNumber: schedule.vehicleNumber,
+              lastLocationUpdate: schedule.lastLocationUpdate,
             },
             route: {
-              id: routeData._id,
-              name: routeData.name,
-              description: routeData.description,
-              distance: routeData.distance,
-              estimatedDuration: routeData.estimatedDuration,
-              stops: routeData.stops,
-              path: routeData.path,
-              costPerKm: routeData.costPerKm,
+              id: route._id,
+              name: route.name,
+              description: route.description,
+              stops: route.stops || [],
+              path: route.path || { coordinates: [] },
+              distance: route.distance,
+              estimatedDuration: route.estimatedDuration,
             },
-            realTimeData: {
-              isLive: schedule.status === "active",
-              hasTracking: !!(
+            realTime: {
+              isLive: Boolean(
                 schedule.currentLocation && schedule.status === "active"
               ),
               lastLocationUpdate: schedule.lastLocationUpdate,

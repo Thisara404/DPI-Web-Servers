@@ -1,5 +1,6 @@
 const express = require("express");
-const MapController = require("../controllers/mapController");
+// Fix: Change from 'controllers' to 'controller'
+const MapController = require("../controller/mapController");
 
 const router = express.Router();
 
