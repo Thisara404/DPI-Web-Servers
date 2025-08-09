@@ -203,28 +203,40 @@ const createProxy = (target, pathRewrite = {}) => {
   });
 };
 
+//// Replace the current routing section with this:
+
 // SLUDI (Authentication) Routes
 app.use('/api/auth', createProxy('http://localhost:3001'));
 app.use('/api/oauth', createProxy('http://localhost:3001'));
+app.use('/api/profile', createProxy('http://localhost:3001'));
 
-// NDX (National Data Exchange) Routes  
-app.use('/api/routes', createProxy('http://localhost:3002'));
-app.use('/api/journeys', createProxy('http://localhost:3002'));
-app.use('/api/schedules', createProxy('http://localhost:3002'));
-
-// PayDPI (Payment) Routes
-app.use('/api/payments', createProxy('http://localhost:3003'));
-app.use('/api/subsidies', createProxy('http://localhost:3003'));
-
-// Driver Authentication Routes (PUBLIC - no auth required)
+// Driver Authentication Routes (PUBLIC)
 app.use('/api/driver/auth', createProxy('http://localhost:4001', {
   '^/api/driver/auth': '/api/auth'
 }));
 
-// Driver API Routes (PROTECTED - auth required) 
-app.use('/api/driver', createProxy('http://localhost:4001', {
-  '^/api/driver': '/api'
+// Driver Schedule & Tracking Routes (PROTECTED)
+app.use('/api/driver/schedules', createProxy('http://localhost:4001', {
+  '^/api/driver/schedules': '/api/schedules'
 }));
+
+app.use('/api/driver/tracking', createProxy('http://localhost:4001', {
+  '^/api/driver/tracking': '/api/tracking'
+}));
+
+// Driver Profile Routes (PROTECTED)
+app.use('/api/driver', createProxy('http://localhost:4001', {
+  '^/api/driver': '/api/driver'
+}));
+
+// NDX (National Data Exchange) Routes  
+app.use('/api/routes', createProxy('http://localhost:3002'));
+app.use('/api/journeys', createProxy('http://localhost:3002'));
+app.use('/api/schedules', createProxy('http://localhost:3002')); // This stays for NDX
+
+// PayDPI (Payment) Routes
+app.use('/api/payments', createProxy('http://localhost:3003'));
+app.use('/api/subsidies', createProxy('http://localhost:3003'));
 
 // OAuth callback for frontend apps (keeping your existing functionality)
 app.get('/callback', (req, res) => {
@@ -378,12 +390,13 @@ app.listen(PORT, () => {
   console.log('📡 ROUTING CONFIGURATION:');
   console.log('   /api/auth/*     → SLUDI (3001)');
   console.log('   /api/oauth/*    → SLUDI (3001)');
+  console.log('   /api/profile/*  → SLUDI (3001)');
   console.log('   /api/routes/*   → NDX (3002)');
   console.log('   /api/journeys/* → NDX (3002)');
   console.log('   /api/schedules/* → NDX (3002)');
   console.log('   /api/payments/* → PayDPI (3003)');
   console.log('   /api/subsidies/* → PayDPI (3003)');
-  console.log('   /api/driver/*   → Driver API (4001)');
+  console.log('   /api/driver/*   → Driver API (4001) [no rewrite]');
   console.log('🌐 =====================================');
   console.log('🎯 Ready for frontend connections!');
   console.log('🌐 =====================================\n');
