@@ -166,6 +166,14 @@ class AppTheme {
   static const Color busColor = Color(0xFF4CAF50);
   static const Color routeColor = Color(0xFF2196F3);
   static const Color stopColor = Color(0xFFFF9800);
+
+  static var accentColor;
+
+  static var cardColor;
+
+  static var backgroundColor;
+
+  static var primaryColor;
 }
 
 // Custom button styles

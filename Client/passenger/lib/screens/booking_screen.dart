@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:passenger/models/schedule.dart';
 import 'package:provider/provider.dart';
 import '../theme.dart';
 import '../providers/schedule_provider.dart';
@@ -46,7 +47,7 @@ class _BookingScreenState extends State<BookingScreen> {
       body: Consumer<ScheduleProvider>(
         builder: (context, provider, child) {
           if (provider.isLoading) {
-            return const Center(
+            return Center(
               child: CircularProgressIndicator(color: AppTheme.accentColor),
             );
           }
@@ -124,7 +125,7 @@ class _BookingScreenState extends State<BookingScreen> {
               children: [
                 Text(
                   'Price: LKR ${schedule.price.toStringAsFixed(2)}',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
                     color: AppTheme.accentColor,
@@ -298,7 +299,7 @@ class _BookingScreenState extends State<BookingScreen> {
     final passenger = Passenger(
       firstName: _nameController.text.split(' ').first,
       lastName: _nameController.text.split(' ').skip(1).join(' '),
-      phone: _phoneController.text,
+      phone: _phoneController.text, age: 0,
     );
 
     final provider = Provider.of<ScheduleProvider>(context, listen: false);

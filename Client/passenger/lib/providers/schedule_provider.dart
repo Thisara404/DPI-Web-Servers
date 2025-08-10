@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/src/widgets/framework.dart';
 import '../models/schedule.dart';
 import '../models/booking.dart';
 import '../services/api_service.dart';
@@ -370,5 +371,20 @@ class ScheduleProvider extends ChangeNotifier {
   void clearError() {
     _error = null;
     notifyListeners();
+  }
+
+  void updateFromFilter(String? from) {
+    _fromFilter = from;
+    _applyFilters();
+  }
+
+  void updateToFilter(String? to) {
+    _toFilter = to;
+    _applyFilters();
+  }
+
+  void updateDateFilter(DateTime? date) {
+    _dateFilter = date;
+    _applyFilters();
   }
 }

@@ -1,4 +1,5 @@
-import 'constants.dart';
+import 'package:passenger/constants.dart';
+import 'package:passenger/models/schedule.dart';
 
 class Journey {
   final String id;
@@ -110,6 +111,8 @@ class BusLocation {
       accuracy: json['accuracy']?.toDouble(),
     );
   }
+
+  get scheduleId => null;
 
   Map<String, dynamic> toJson() {
     return {

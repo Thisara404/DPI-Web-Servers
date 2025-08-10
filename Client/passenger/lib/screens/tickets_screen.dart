@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:passenger/constants.dart';
+import 'package:passenger/models/booking.dart';
 import 'package:provider/provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import '../theme.dart';
@@ -11,7 +13,8 @@ class TicketsScreen extends StatefulWidget {
   State<TicketsScreen> createState() => _TicketsScreenState();
 }
 
-class _TicketsScreenState extends State<TicketsScreen> with SingleTickerProviderStateMixin {
+class _TicketsScreenState extends State<TicketsScreen>
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
 
   @override
@@ -48,7 +51,7 @@ class _TicketsScreenState extends State<TicketsScreen> with SingleTickerProvider
       body: Consumer<ScheduleProvider>(
         builder: (context, provider, child) {
           if (provider.isLoading) {
-            return const Center(
+            return Center(
               child: CircularProgressIndicator(color: AppTheme.accentColor),
             );
           }
@@ -66,11 +69,14 @@ class _TicketsScreenState extends State<TicketsScreen> with SingleTickerProvider
   }
 
   Widget _buildActiveTickets(ScheduleProvider provider) {
-    final activeTickets = provider.tickets.where((ticket) => 
-        ticket.status == TicketStatus.active && ticket.isValid).toList();
+    final activeTickets = provider.tickets
+        .where(
+            (ticket) => ticket.status == TicketStatus.active && ticket.isValid)
+        .toList();
 
     if (activeTickets.isEmpty) {
-      return _buildEmptyState('No active tickets', 'Book a journey to get started!');
+      return _buildEmptyState(
+          'No active tickets', 'Book a journey to get started!');
     }
 
     return RefreshIndicator(
@@ -88,11 +94,15 @@ class _TicketsScreenState extends State<TicketsScreen> with SingleTickerProvider
   }
 
   Widget _buildPastTickets(ScheduleProvider provider) {
-    final pastTickets = provider.tickets.where((ticket) => 
-        ticket.status == TicketStatus.used || ticket.status == TicketStatus.expired).toList();
+    final pastTickets = provider.tickets
+        .where((ticket) =>
+            ticket.status == TicketStatus.used ||
+            ticket.status == TicketStatus.expired)
+        .toList();
 
     if (pastTickets.isEmpty) {
-      return _buildEmptyState('No past tickets', 'Your travel history will appear here');
+      return _buildEmptyState(
+          'No past tickets', 'Your travel history will appear here');
     }
 
     return ListView.builder(
@@ -175,7 +185,8 @@ class _TicketsScreenState extends State<TicketsScreen> with SingleTickerProvider
                     const SizedBox(width: 8),
                     IconButton(
                       onPressed: () => _shareTicket(ticket),
-                      icon: const Icon(Icons.share, color: AppTheme.textSecondary),
+                      icon: const Icon(Icons.share,
+                          color: AppTheme.textSecondary),
                     ),
                   ],
                 ),
@@ -190,7 +201,7 @@ class _TicketsScreenState extends State<TicketsScreen> with SingleTickerProvider
   Widget _buildStatusBadge(TicketStatus status) {
     Color color;
     String text;
-    
+
     switch (status) {
       case TicketStatus.active:
         color = Colors.green;
@@ -325,7 +336,8 @@ class _TicketsScreenState extends State<TicketsScreen> with SingleTickerProvider
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: AppTheme.cardColor,
-        title: const Text('Ticket Details', style: TextStyle(color: Colors.white)),
+        title:
+            const Text('Ticket Details', style: TextStyle(color: Colors.white)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,

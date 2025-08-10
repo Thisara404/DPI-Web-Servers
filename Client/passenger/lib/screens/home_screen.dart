@@ -1,4 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:passenger/constants.dart';
+import 'package:passenger/models/booking.dart';
+import 'package:passenger/screens/journey_screen.dart';
+import 'package:passenger/screens/profile_screen.dart';
+import 'package:passenger/screens/schedules_screen.dart';
+import 'package:passenger/screens/tickets_screen.dart';
 import 'package:provider/provider.dart';
 import '../theme.dart';
 import '../providers/auth_provider.dart';
@@ -477,6 +483,12 @@ class _HomeScreenState extends State<HomeScreen> {
         color = Colors.red;
         text = 'Cancelled';
         break;
+      case BookingStatus.completed:
+        // TODO: Handle this case.
+        throw UnimplementedError();
+      case BookingStatus.refunded:
+        // TODO: Handle this case.
+        throw UnimplementedError();
     }
 
     return Container(

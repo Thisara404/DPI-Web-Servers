@@ -130,7 +130,7 @@ class _MapScreenState extends State<MapScreen> {
       body: Consumer<JourneyProvider>(
         builder: (context, provider, child) {
           if (_isLoading) {
-            return const Center(
+            return Center(
               child: CircularProgressIndicator(color: AppTheme.accentColor),
             );
           }

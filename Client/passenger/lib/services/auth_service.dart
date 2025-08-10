@@ -1,4 +1,6 @@
 import 'dart:convert';
+import 'package:passenger/constants.dart';
+
 import '../models/user.dart';
 import 'api_service.dart';
 import 'storage_service.dart';

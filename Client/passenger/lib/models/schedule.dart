@@ -1,4 +1,4 @@
-import 'constants.dart';
+import 'package:passenger/constants.dart';
 
 class Schedule {
   final String id;

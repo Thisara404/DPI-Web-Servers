@@ -51,7 +51,7 @@ class _SchedulesScreenState extends State<SchedulesScreen> {
               _buildFilterChips(provider),
               Expanded(
                 child: provider.isLoading
-                    ? const Center(
+                    ? Center(
                         child: CircularProgressIndicator(
                             color: AppTheme.accentColor),
                       )
@@ -122,7 +122,7 @@ class _SchedulesScreenState extends State<SchedulesScreen> {
             label: const Text('Add Filters'),
             onPressed: _showFilterDialog,
             backgroundColor: AppTheme.accentColor.withOpacity(0.2),
-            labelStyle: const TextStyle(color: AppTheme.accentColor),
+            labelStyle: TextStyle(color: AppTheme.accentColor),
           ),
         ],
       ),
@@ -136,7 +136,7 @@ class _SchedulesScreenState extends State<SchedulesScreen> {
         label: Text(label),
         onDeleted: onDeleted,
         backgroundColor: AppTheme.accentColor.withOpacity(0.2),
-        labelStyle: const TextStyle(color: AppTheme.accentColor),
+        labelStyle: TextStyle(color: AppTheme.accentColor),
         deleteIconColor: AppTheme.accentColor,
       ),
     );
@@ -258,7 +258,7 @@ class _SchedulesScreenState extends State<SchedulesScreen> {
                 children: [
                   Text(
                     'LKR ${schedule.price.toStringAsFixed(2)}',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
                       color: AppTheme.accentColor,
@@ -416,7 +416,7 @@ class _SchedulesScreenState extends State<SchedulesScreen> {
                 style: const TextStyle(color: Colors.white),
               ),
               trailing:
-                  const Icon(Icons.calendar_today, color: AppTheme.accentColor),
+                  Icon(Icons.calendar_today, color: AppTheme.accentColor),
               onTap: _selectDate,
             ),
           ],
@@ -444,7 +444,7 @@ class _SchedulesScreenState extends State<SchedulesScreen> {
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
-            colorScheme: const ColorScheme.dark(
+            colorScheme: ColorScheme.dark(
               primary: AppTheme.accentColor,
               surface: AppTheme.cardColor,
             ),

@@ -34,7 +34,7 @@ class TransitLankaApp extends StatelessWidget {
       initialLocation: authProvider.isAuthenticated ? '/home' : '/auth',
       redirect: (context, state) {
         final bool isAuthenticated = authProvider.isAuthenticated;
-        final String location = state.location;
+        final String location = state.uri.path;
 
         // If not authenticated and trying to access protected routes
         if (!isAuthenticated && !location.startsWith('/auth')) {
@@ -64,7 +64,7 @@ class TransitLankaApp extends StatelessWidget {
         GoRoute(
           path: '/booking',
           builder: (context, state) {
-            final scheduleId = state.queryParameters['scheduleId'];
+            final scheduleId = state.uri.queryParameters['scheduleId'];
             return BookingScreen(scheduleId: scheduleId);
           },
         ),

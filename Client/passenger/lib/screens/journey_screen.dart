@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:passenger/constants.dart';
 import 'package:provider/provider.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../theme.dart';
@@ -51,7 +52,7 @@ class _JourneyScreenState extends State<JourneyScreen> {
       body: Consumer<JourneyProvider>(
         builder: (context, provider, child) {
           if (provider.isLoading) {
-            return const Center(
+            return Center(
               child: CircularProgressIndicator(color: AppTheme.accentColor),
             );
           }
@@ -113,7 +114,7 @@ class _JourneyScreenState extends State<JourneyScreen> {
                   const SizedBox(width: 8),
                   Text(
                     'ETA: ${_formatDuration(journey.estimatedTimeToArrival!)}',
-                    style: const TextStyle(color: AppTheme.accentColor),
+                    style: TextStyle(color: AppTheme.accentColor),
                   ),
                 ],
               ),
