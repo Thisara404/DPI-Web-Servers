@@ -18,13 +18,19 @@ const verifyToken = async (req, res, next) => {
       ? authHeader.substring(7) 
       : authHeader;
 
-    // First try to decode the token locally
+    // Always try to decode the token locally first
     try {
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
       
+      console.log(`🔍 Token decoded successfully:`, {
+        type: decoded.type,
+        passengerId: decoded.passengerId,
+        email: decoded.email
+      });
+
       // Handle temporary tokens (for unverified passengers)
       if (decoded.type === 'temp_access') {
-        const passenger = await Passenger.findById(decoded.passengerId);
+        const passenger = await Passenger.findById(decoded.passengerId).select('+tempPassword');
         
         if (!passenger) {
           return res.status(401).json({
@@ -33,24 +39,44 @@ const verifyToken = async (req, res, next) => {
           });
         }
 
+        // Check if passenger still exists and email matches
+        if (passenger.email !== decoded.email) {
+          return res.status(401).json({
+            success: false,
+            message: 'Token mismatch'
+          });
+        }
+
         req.passenger = passenger;
         req.token = token;
         req.tokenType = 'temporary';
+        console.log(`🔓 Temporary token verified for: ${passenger.email}`);
         return next();
       }
-    } catch (jwtError) {
-      // If local JWT verification fails, try SLUDI
-    }
 
-    // For verified passengers, verify with SLUDI through API Gateway
-    try {
-      const sludiResponse = await apiGateway.authenticateWithSLUDI(token);
-      
-      if (sludiResponse.success && sludiResponse.data.citizen) {
-        const citizenData = sludiResponse.data.citizen;
+      // Handle regular JWT tokens (could be from SLUDI or local)
+      if (decoded.passengerId) {
+        // This is a local token with passengerId
+        const passenger = await Passenger.findById(decoded.passengerId);
         
-        // Find passenger record
-        let passenger = await Passenger.findOne({ citizenId: citizenData.citizenId });
+        if (!passenger) {
+          return res.status(401).json({
+            success: false,
+            message: 'Passenger not found'
+          });
+        }
+        
+        req.passenger = passenger;
+        req.token = token;
+        req.tokenType = 'local';
+        console.log(`🔓 Local token verified for: ${passenger.email}`);
+        return next();
+      }
+
+      // Handle SLUDI tokens (for verified passengers)
+      if (decoded.citizenId && !decoded.passengerId) {
+        // This is a SLUDI token, find passenger by citizenId
+        const passenger = await Passenger.findOne({ citizenId: decoded.citizenId });
         
         if (!passenger) {
           return res.status(401).json({
@@ -62,20 +88,48 @@ const verifyToken = async (req, res, next) => {
         req.passenger = passenger;
         req.token = token;
         req.tokenType = 'sludi';
-        next();
-      } else {
-        return res.status(401).json({
-          success: false,
-          message: 'Invalid token or citizen data'
-        });
+        console.log(`🔓 SLUDI token verified for: ${passenger.email}`);
+        return next();
       }
-    } catch (sludiError) {
-      console.error('SLUDI authentication error:', sludiError.message);
+
+    } catch (jwtError) {
+      console.log('JWT verification failed, trying SLUDI authentication...');
+      
+      // Only try SLUDI if the token doesn't look like our temporary token
+      if (!token.includes('temp_access')) {
+        try {
+          const sludiResponse = await apiGateway.authenticateWithSLUDI(token);
+          
+          if (sludiResponse.success && sludiResponse.data.citizen) {
+            const citizenData = sludiResponse.data.citizen;
+            
+            // Find passenger record
+            let passenger = await Passenger.findOne({ citizenId: citizenData.citizenId });
+            
+            if (!passenger) {
+              return res.status(401).json({
+                success: false,
+                message: 'Passenger record not found'
+              });
+            }
+            
+            req.passenger = passenger;
+            req.token = token;
+            req.tokenType = 'sludi';
+            console.log(`🔓 SLUDI authentication successful for: ${passenger.email}`);
+            return next();
+          }
+        } catch (sludiError) {
+          console.error('SLUDI authentication error:', sludiError.message);
+        }
+      }
+      
       return res.status(401).json({
         success: false,
         message: 'Authentication failed'
       });
     }
+
   } catch (error) {
     console.error('Token verification error:', error);
     return res.status(500).json({

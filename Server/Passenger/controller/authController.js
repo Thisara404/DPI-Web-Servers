@@ -1,6 +1,6 @@
 const apiGateway = require('../config/apiGateway');
-// Fix: Change from '../models/Passenger' to '../model/Passenger'
 const Passenger = require('../model/Passenger');
+const jwt = require('jsonwebtoken');
 
 class AuthController {
   // Register new passenger directly (without SLUDI initially)
@@ -176,25 +176,88 @@ class AuthController {
     }
   }
 
-  // Login passenger (works for both verified and unverified)
-  static async login(req, res) {
-    try {
-      const { email, password } = req.body;
 
-      console.log(`🔐 Logging in passenger: ${email}`);
+// Login passenger (works for both verified and unverified)
+static async login(req, res) {
+  try {
+    const { email, password } = req.body;
 
-      // Find passenger by email
-      const passenger = await Passenger.findOne({ email });
+    console.log(`🔐 Logging in passenger: ${email}`);
 
-      if (!passenger) {
-        return res.status(401).json({
-          success: false,
-          message: 'Invalid email or password'
+    // Find passenger by email and include tempPassword
+    const passenger = await Passenger.findOne({ email }).select('+tempPassword');
+
+    if (!passenger) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid email or password'
+      });
+    }
+
+    console.log(`🔍 Debug - Passenger found:`, {
+      email: passenger.email,
+      isVerified: passenger.isVerified,
+      hasTemp: !!passenger.tempPassword,
+      citizenId: passenger.citizenId,
+      status: passenger.status
+    });
+
+    // For unverified passengers, compare with stored temporary password
+    if (!passenger.isVerified && passenger.tempPassword) {
+      console.log(`🔍 Debug - Password comparison:`, {
+        provided: password,
+        stored: passenger.tempPassword,
+        match: passenger.tempPassword === password
+      });
+
+      // Direct password comparison for temporary accounts
+      if (passenger.tempPassword === password) {
+        // Generate temporary token (similar to Driver pattern)
+        const tempToken = jwt.sign(
+          {
+            passengerId: passenger._id,
+            citizenId: passenger.citizenId,
+            email: passenger.email,
+            type: 'temp_access'
+          },
+          process.env.JWT_SECRET,
+          { expiresIn: '7d' }
+        );
+
+        // Update last login
+        passenger.lastLogin = new Date();
+        await passenger.save();
+
+        res.json({
+          success: true,
+          message: 'Login successful. Please verify your Citizen ID to access full features.',
+          data: {
+            passenger: {
+              id: passenger._id,
+              citizenId: passenger.citizenId,
+              firstName: passenger.firstName,
+              lastName: passenger.lastName,
+              email: passenger.email,
+              phone: passenger.phone,
+              isVerified: passenger.isVerified,
+              status: passenger.status,
+              requiresCitizenVerification: true
+            },
+            tokens: {
+              accessToken: tempToken,
+              tokenType: 'temporary',
+              expiresIn: '7d'
+            }
+          }
         });
+        console.log(`✅ Passenger logged in (temporary): ${passenger.email}`);
+        return;
       }
+    }
 
-      // If passenger is verified, use SLUDI login
-      if (passenger.isVerified && passenger.citizenId && !passenger.citizenId.startsWith('TEMP_')) {
+    // If passenger is verified, use SLUDI login
+    if (passenger.isVerified && passenger.citizenId && !passenger.citizenId.startsWith('TEMP_')) {
+      try {
         const sludiResponse = await apiGateway.loginWithSLUDI({
           email,
           password
@@ -202,7 +265,8 @@ class AuthController {
 
         if (sludiResponse.success && sludiResponse.data.citizen) {
           // Update last login
-          await passenger.updateLastLogin();
+          passenger.lastLogin = new Date();
+          await passenger.save();
 
           res.json({
             success: true,
@@ -223,67 +287,30 @@ class AuthController {
               tokens: sludiResponse.data.tokens
             }
           });
-        } else {
-          return res.status(401).json({
-            success: false,
-            message: 'Invalid credentials'
-          });
+          return;
         }
-      } else {
-        // For unverified passengers, use temporary password
-        if (passenger.tempPassword === password) {
-          const jwt = require('jsonwebtoken');
-          const tempToken = jwt.sign(
-            {
-              passengerId: passenger._id,
-              citizenId: passenger.citizenId,
-              email: passenger.email,
-              type: 'temp_access'
-            },
-            process.env.JWT_SECRET,
-            { expiresIn: '7d' }
-          );
-
-          res.json({
-            success: true,
-            message: 'Login successful. Please verify your Citizen ID to access full features.',
-            data: {
-              passenger: {
-                id: passenger._id,
-                citizenId: passenger.citizenId,
-                firstName: passenger.firstName,
-                lastName: passenger.lastName,
-                email: passenger.email,
-                phone: passenger.phone,
-                isVerified: passenger.isVerified,
-                status: passenger.status,
-                requiresCitizenVerification: true
-              },
-              tokens: {
-                accessToken: tempToken,
-                tokenType: 'temporary',
-                expiresIn: '7d'
-              }
-            }
-          });
-        } else {
-          return res.status(401).json({
-            success: false,
-            message: 'Invalid credentials'
-          });
-        }
+      } catch (sludiError) {
+        console.error('SLUDI login error:', sludiError);
+        // Fall through to invalid credentials
       }
-
-      console.log(`✅ Passenger logged in: ${passenger.email}`);
-    } catch (error) {
-      console.error('Login error:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Login failed',
-        error: error.message
-      });
     }
+
+    // If we get here, credentials are invalid
+    console.log(`❌ Invalid credentials for: ${email}`);
+    return res.status(401).json({
+      success: false,
+      message: 'Invalid credentials'
+    });
+
+  } catch (error) {
+    console.error('Login error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Login failed',
+      error: error.message
+    });
   }
+}
 
   // Get passenger profile
   static async getProfile(req, res) {

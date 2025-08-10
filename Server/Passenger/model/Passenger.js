@@ -146,6 +146,10 @@ passengerSchema.statics.findByCitizenId = function(citizenId) {
   return this.findOne({ citizenId });
 };
 
+passengerSchema.methods.getWithPassword = function() {
+  return this.model('Passenger').findById(this._id).select('+tempPassword');
+};
+
 // Indexes
 passengerSchema.index({ citizenId: 1 });
 passengerSchema.index({ email: 1 });
