@@ -1,311 +1,374 @@
-import 'package:flutter/material.dart';
-import 'package:location/location.dart';
-import 'package:transit_lanka/core/models/journey.dart';
-import 'package:transit_lanka/core/services/journey.service.dart';
+import 'package:flutter/foundation.dart';
+import '../models/schedule.dart';
+import '../models/booking.dart';
+import '../services/api_service.dart';
+import '../constants.dart';
 
-class JourneyProvider with ChangeNotifier {
-  final JourneyService _journeyService = JourneyService();
-
-  // Driver journey tracking data
-  JourneyTrackingData? _activeJourney;
-  List<JourneyTrackingData> _journeyHistory = [];
-
-  // Passenger journey data
-  Journey? _activeTicket;
-  List<Journey> _ticketHistory = [];
-
-  bool _isTracking = false;
+class ScheduleProvider extends ChangeNotifier {
+  List<Schedule> _schedules = [];
+  List<Schedule> _filteredSchedules = [];
+  List<Booking> _bookings = [];
+  List<Ticket> _tickets = [];
+  List<Schedule> _favorites = [];
+  
   bool _isLoading = false;
+  bool _isBookingLoading = false;
   String? _error;
+  
+  Schedule? _selectedSchedule;
+  Booking? _currentBooking;
+  
+  // Search filters
+  String _searchQuery = '';
+  String? _fromFilter;
+  String? _toFilter;
+  DateTime? _dateFilter;
 
-  // Getters for driver journey
-  JourneyTrackingData? get activeJourney => _activeJourney;
-  List<JourneyTrackingData> get journeyHistory => _journeyHistory;
-
-  // Getters for passenger tickets
-  Journey? get activeTicket => _activeTicket;
-  List<Journey> get ticketHistory => _ticketHistory;
-
-  bool get isTracking => _isTracking;
+  // Getters
+  List<Schedule> get schedules => _filteredSchedules.isNotEmpty ? _filteredSchedules : _schedules;
+  List<Booking> get bookings => _bookings;
+  List<Ticket> get tickets => _tickets;
+  List<Schedule> get favorites => _favorites;
+  
   bool get isLoading => _isLoading;
+  bool get isBookingLoading => _isBookingLoading;
   String? get error => _error;
+  
+  Schedule? get selectedSchedule => _selectedSchedule;
+  Booking? get currentBooking => _currentBooking;
+  
+  String get searchQuery => _searchQuery;
+  String? get fromFilter => _fromFilter;
+  String? get toFilter => _toFilter;
+  DateTime? get dateFilter => _dateFilter;
 
-  // Start a new journey (driver)
-  Future<bool> startJourney(String scheduleId) async {
-    _setLoading(true);
+  // Load Schedules
+  Future<void> loadSchedules() async {
+    setLoading(true);
+    clearError();
+
     try {
-      final journey = await _journeyService.startJourney(scheduleId);
-      if (journey != null) {
-        _activeJourney = journey;
-        _isTracking = true;
+      final response = await ApiService.getSchedules();
+      
+      if (response['success'] == true) {
+        _schedules = (response['schedules'] as List)
+            .map((schedule) => Schedule.fromJson(schedule))
+            .toList();
+        _applyFilters();
+      } else {
+        throw Exception(response['message'] ?? 'Failed to load schedules');
+      }
+    } catch (e) {
+      _error = e.toString();
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // Search Schedules
+  Future<void> searchSchedules({
+    String? from,
+    String? to,
+    DateTime? date,
+    String? query,
+  }) async {
+    setLoading(true);
+    clearError();
+
+    try {
+      final filters = <String, String>{};
+      if (from != null) filters['from'] = from;
+      if (to != null) filters['to'] = to;
+      if (date != null) filters['date'] = date.toIso8601String().split('T')[0];
+      if (query != null && query.isNotEmpty) filters['query'] = query;
+
+      final response = await ApiService.searchSchedules(filters);
+      
+      if (response['success'] == true) {
+        _schedules = (response['schedules'] as List)
+            .map((schedule) => Schedule.fromJson(schedule))
+            .toList();
+        
+        // Update filters
+        _fromFilter = from;
+        _toFilter = to;
+        _dateFilter = date;
+        _searchQuery = query ?? '';
+        
+        _applyFilters();
+      } else {
+        throw Exception(response['message'] ?? 'Failed to search schedules');
+      }
+    } catch (e) {
+      _error = e.toString();
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // Get Schedule Details
+  Future<Schedule?> getScheduleDetails(String scheduleId) async {
+    try {
+      final response = await ApiService.getScheduleDetails(scheduleId);
+      
+      if (response['success'] == true) {
+        final schedule = Schedule.fromJson(response['schedule']);
+        _selectedSchedule = schedule;
         notifyListeners();
-        return true;
-      }
-      return false;
-    } catch (e) {
-      _error = 'Failed to start journey: $e';
-      return false;
-    } finally {
-      _setLoading(false);
-    }
-  }
-
-  // End active journey (driver)
-  Future<bool> endJourney() async {
-    if (_activeJourney == null) return false;
-
-    _setLoading(true);
-    try {
-      final success = await _journeyService.endJourney(_activeJourney!.id);
-      if (success) {
-        _isTracking = false;
-        await loadJourneyHistory();
-        _activeJourney = null;
-        notifyListeners();
-      }
-      return success;
-    } catch (e) {
-      _error = 'Failed to end journey: $e';
-      return false;
-    } finally {
-      _setLoading(false);
-    }
-  }
-
-  // Mark checkpoint as completed (driver)
-  Future<bool> completeCheckpoint(String stopId) async {
-    if (_activeJourney == null) return false;
-
-    _setLoading(true);
-    try {
-      final success =
-          await _journeyService.completeCheckpoint(_activeJourney!.id, stopId);
-      if (success) {
-        // Update local journey data to reflect checkpoint completion
-        await loadActiveJourney();
-      }
-      return success;
-    } catch (e) {
-      _error = 'Failed to complete checkpoint: $e';
-      return false;
-    } finally {
-      _setLoading(false);
-    }
-  }
-
-  // Load active journey if exists (driver)
-  Future<void> loadActiveJourney() async {
-    _setLoading(true);
-    try {
-      final journey = await _journeyService.getDriverActiveJourney();
-      _activeJourney = journey;
-      _isTracking = journey != null;
-      _error = null;
-    } catch (e) {
-      _error = 'Failed to load active journey: $e';
-    } finally {
-      _setLoading(false);
-    }
-  }
-
-  // Update driver location
-  Future<bool> updateLocation(LocationData location) async {
-    if (_activeJourney == null || !_isTracking) return false;
-
-    try {
-      return await _journeyService.updateDriverLocation(
-          _activeJourney!.id, location);
-    } catch (e) {
-      _error = 'Failed to update location: $e';
-      return false;
-    }
-  }
-
-  // Load journey history (driver)
-  Future<void> loadJourneyHistory() async {
-    _setLoading(true);
-    try {
-      _journeyHistory = await _journeyService.getDriverJourneyHistory();
-      _error = null;
-    } catch (e) {
-      _error = 'Failed to load journey history: $e';
-    } finally {
-      _setLoading(false);
-    }
-  }
-
-  // Book a journey (passenger)
-  Future<Map<String, dynamic>> bookJourney(
-    String scheduleId,
-    String paymentMethod,
-    List<Map<String, dynamic>> additionalPassengers,
-  ) async {
-    _setLoading(true);
-    try {
-      final result = await _journeyService.bookJourney(
-        scheduleId,
-        paymentMethod,
-        additionalPassengers,
-      );
-
-      // If booking was successful, refresh passenger tickets
-      if (result['status'] == true) {
-        await loadActiveTickets();
-      }
-
-      return result;
-    } catch (e) {
-      _error = 'Failed to book journey: $e';
-      return {
-        'status': false,
-        'message': _error,
-      };
-    } finally {
-      _setLoading(false);
-    }
-  }
-
-  // Load active tickets (passenger)
-  Future<void> loadActiveTickets() async {
-    _setLoading(true);
-    try {
-      final tickets = await _journeyService.getActiveTickets();
-      if (tickets != null) {
-        _ticketHistory = tickets;
-        _activeTicket = tickets.isNotEmpty ? tickets.first : null;
-      }
-      _error = null;
-    } catch (e) {
-      _error = 'Failed to load active tickets: $e';
-    } finally {
-      _setLoading(false);
-    }
-  }
-
-  // Load ticket history (passenger)
-  Future<void> loadTicketHistory({int page = 1, int limit = 10}) async {
-    _setLoading(true);
-    try {
-      final tickets = await _journeyService.getCompletedTickets(
-        page: page,
-        limit: limit,
-      );
-      if (tickets != null) {
-        _ticketHistory = tickets;
-      }
-      _error = null;
-    } catch (e) {
-      _error = 'Failed to load ticket history: $e';
-    } finally {
-      _setLoading(false);
-    }
-  }
-
-  // Get journey details (passenger or driver)
-  Future<Journey?> getJourneyDetails(String journeyId) async {
-    _setLoading(true);
-    try {
-      final result = await _journeyService.getJourneyDetails(journeyId);
-      if (result['status'] == true && result['data'] != null) {
-        return Journey.fromJson(result['data']);
+        return schedule;
       }
       return null;
     } catch (e) {
-      _error = 'Failed to get journey details: $e';
+      _error = e.toString();
+      notifyListeners();
       return null;
-    } finally {
-      _setLoading(false);
     }
   }
 
-  // Verify journey (driver)
-  Future<bool> verifyJourney(String journeyId) async {
-    _setLoading(true);
-    try {
-      final result = await _journeyService.verifyJourney(journeyId);
-      return result['status'] == true;
-    } catch (e) {
-      _error = 'Failed to verify journey: $e';
-      return false;
-    } finally {
-      _setLoading(false);
-    }
-  }
+  // Create Booking
+  Future<bool> createBooking({
+    required String scheduleId,
+    required List<Passenger> passengers,
+  }) async {
+    setBookingLoading(true);
+    clearError();
 
-  // Cancel journey (passenger)
-  Future<bool> cancelJourney(String journeyId) async {
-    _setLoading(true);
     try {
-      final result = await _journeyService.cancelJourney(journeyId);
-      if (result['status'] == true) {
-        // Refresh ticket data
-        await loadActiveTickets();
-        return true;
-      }
-      return false;
-    } catch (e) {
-      _error = 'Failed to cancel journey: $e';
-      return false;
-    } finally {
-      _setLoading(false);
-    }
-  }
-
-  // Process payment (passenger)
-  Future<Map<String, dynamic>> initiatePayment(String journeyId) async {
-    _setLoading(true);
-    try {
-      final result = await _journeyService.initiatePayment(journeyId);
-      return result;
-    } catch (e) {
-      _error = 'Failed to initiate payment: $e';
-      return {
-        'status': false,
-        'message': _error,
+      final bookingData = {
+        'scheduleId': scheduleId,
+        'passengers': passengers.map((p) => p.toJson()).toList(),
       };
+
+      final response = await ApiService.createBooking(bookingData);
+      
+      if (response['success'] == true) {
+        _currentBooking = Booking.fromJson(response['booking']);
+        notifyListeners();
+        return true;
+      } else {
+        throw Exception(response['message'] ?? 'Failed to create booking');
+      }
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+      return false;
     } finally {
-      _setLoading(false);
+      setBookingLoading(false);
     }
   }
 
-  // Capture payment (passenger)
-  Future<bool> capturePayment(String orderId) async {
-    _setLoading(true);
+  // Process Payment
+  Future<bool> processPayment({
+    required String bookingId,
+    required Map<String, dynamic> paymentData,
+  }) async {
+    setBookingLoading(true);
+    clearError();
+
     try {
-      final result = await _journeyService.capturePayment(orderId);
-      if (result['status'] == true) {
-        await loadActiveTickets();
+      final response = await ApiService.processPayment(bookingId, paymentData);
+      
+      if (response['success'] == true) {
+        _currentBooking = Booking.fromJson(response['booking']);
+        await loadBookings(); // Refresh bookings
+        await loadTickets();  // Refresh tickets
+        notifyListeners();
+        return true;
+      } else {
+        throw Exception(response['message'] ?? 'Payment failed');
+      }
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+      return false;
+    } finally {
+      setBookingLoading(false);
+    }
+  }
+
+  // Load Bookings
+  Future<void> loadBookings() async {
+    try {
+      final response = await ApiService.getBookings();
+      
+      if (response['success'] == true) {
+        _bookings = (response['bookings'] as List)
+            .map((booking) => Booking.fromJson(booking))
+            .toList();
+        notifyListeners();
+      }
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+    }
+  }
+
+  // Load Tickets
+  Future<void> loadTickets() async {
+    try {
+      final response = await ApiService.getTickets();
+      
+      if (response['success'] == true) {
+        _tickets = (response['tickets'] as List)
+            .map((ticket) => Ticket.fromJson(ticket))
+            .toList();
+        notifyListeners();
+      }
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+    }
+  }
+
+  // Cancel Booking
+  Future<bool> cancelBooking(String bookingId) async {
+    setBookingLoading(true);
+    clearError();
+
+    try {
+      final response = await ApiService.cancelBooking(bookingId);
+      
+      if (response['success'] == true) {
+        await loadBookings(); // Refresh bookings
+        return true;
+      } else {
+        throw Exception(response['message'] ?? 'Failed to cancel booking');
+      }
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+      return false;
+    } finally {
+      setBookingLoading(false);
+    }
+  }
+
+  // Load Favorites
+  Future<void> loadFavorites() async {
+    try {
+      final response = await ApiService.getFavorites();
+      
+      if (response['success'] == true) {
+        _favorites = (response['favorites'] as List)
+            .map((schedule) => Schedule.fromJson(schedule))
+            .toList();
+        notifyListeners();
+      }
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+    }
+  }
+
+  // Add to Favorites
+  Future<bool> addToFavorites(String routeId) async {
+    try {
+      final response = await ApiService.addFavorite(routeId);
+      
+      if (response['success'] == true) {
+        await loadFavorites(); // Refresh favorites
         return true;
       }
       return false;
     } catch (e) {
-      _error = 'Failed to capture payment: $e';
+      _error = e.toString();
+      notifyListeners();
       return false;
-    } finally {
-      _setLoading(false);
     }
   }
 
-  // Set loading state
-  void _setLoading(bool loading) {
+  // Remove from Favorites
+  Future<bool> removeFromFavorites(String routeId) async {
+    try {
+      final response = await ApiService.removeFavorite(routeId);
+      
+      if (response['success'] == true) {
+        await loadFavorites(); // Refresh favorites
+        return true;
+      }
+      return false;
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+      return false;
+    }
+  }
+
+  // Apply local filters
+  void _applyFilters() {
+    _filteredSchedules = _schedules.where((schedule) {
+      bool matchesSearch = _searchQuery.isEmpty || 
+          schedule.routeName.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+          schedule.from.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+          schedule.to.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+          schedule.busNumber.toLowerCase().contains(_searchQuery.toLowerCase());
+      
+      bool matchesFrom = _fromFilter == null || schedule.from == _fromFilter;
+      bool matchesToTo = _toFilter == null || schedule.to == _toFilter;
+      
+      bool matchesDate = _dateFilter == null || 
+          (schedule.departureTime.year == _dateFilter!.year &&
+           schedule.departureTime.month == _dateFilter!.month &&
+           schedule.departureTime.day == _dateFilter!.day);
+      
+      return matchesSearch && matchesFrom && matchesToTo && matchesDate;
+    }).toList();
+    
+    notifyListeners();
+  }
+
+  // Update search query
+  void updateSearchQuery(String query) {
+    _searchQuery = query;
+    _applyFilters();
+  }
+
+  // Update filters
+  void updateFilters({
+    String? from,
+    String? to,
+    DateTime? date,
+  }) {
+    _fromFilter = from;
+    _toFilter = to;
+    _dateFilter = date;
+    _applyFilters();
+  }
+
+  // Clear filters
+  void clearFilters() {
+    _searchQuery = '';
+    _fromFilter = null;
+    _toFilter = null;
+    _dateFilter = null;
+    _applyFilters();
+  }
+
+  // Select schedule
+  void selectSchedule(Schedule schedule) {
+    _selectedSchedule = schedule;
+    notifyListeners();
+  }
+
+  // Clear selected schedule
+  void clearSelectedSchedule() {
+    _selectedSchedule = null;
+    notifyListeners();
+  }
+
+  // Helper methods
+  void setLoading(bool loading) {
     _isLoading = loading;
     notifyListeners();
   }
 
-  // Clear error
-  void clearError() {
-    _error = null;
+  void setBookingLoading(bool loading) {
+    _isBookingLoading = loading;
     notifyListeners();
   }
 
-  // Initialize provider based on user role
-  Future<void> initialize(String role) async {
-    if (role == 'driver') {
-      await loadActiveJourney();
-      await loadJourneyHistory();
-    } else if (role == 'passenger') {
-      await loadActiveTickets();
-      await loadTicketHistory();
-    }
+  void clearError() {
+    _error = null;
+    notifyListeners();
   }
 }

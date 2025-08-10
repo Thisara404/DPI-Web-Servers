@@ -1,59 +1,43 @@
 import 'package:flutter/foundation.dart';
 import '../models/user.dart';
-import '../services/api/auth_service.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import '../services/auth_service.dart';
+import '../constants.dart';
 
-class AuthProvider with ChangeNotifier {
-  final AuthService _authService = AuthService();
-
-  User? _currentUser;
+class AuthProvider extends ChangeNotifier {
+  User? _user;
   bool _isLoading = false;
   String? _error;
+  bool _isInitialized = false;
 
-  User? get currentUser => _currentUser;
+  // Getters
+  User? get user => _user;
   bool get isLoading => _isLoading;
   String? get error => _error;
-  bool get isAuthenticated => _currentUser != null;
-  bool get isDriver => _currentUser?.role == 'driver';
-  bool get isPassenger => _currentUser?.role == 'passenger';
+  bool get isAuthenticated => _user != null;
+  bool get isInitialized => _isInitialized;
 
-  // Add this getter to expose the token
-  String? get token => _currentUser?.token;
-
-  // Initialize provider by checking stored user data
+  // Initialize auth state
   Future<void> initialize() async {
-    _isLoading = true;
-    notifyListeners();
-
+    if (_isInitialized) return;
+    
+    setLoading(true);
     try {
-      final user = await _authService.getCurrentUser();
-      if (user != null) {
-        // Validate token before setting user
-        final isValid =
-            await _authService.validateToken(user.token ?? '', user.role);
-
-        if (isValid) {
-          _currentUser = user;
-        }
-      }
-      _error = null;
+      _user = await AuthService.getCurrentUser();
+      _isInitialized = true;
     } catch (e) {
       _error = e.toString();
     } finally {
-      _isLoading = false;
-      notifyListeners();
+      setLoading(false);
     }
   }
 
-  // Login method
-  Future<bool> login(String email, String password, String role) async {
-    _isLoading = true;
-    _error = null;
-    notifyListeners();
+  // Login
+  Future<bool> login(String email, String password) async {
+    setLoading(true);
+    clearError();
 
     try {
-      _currentUser = await _authService.login(email, password, role);
+      _user = await AuthService.login(email, password);
       notifyListeners();
       return true;
     } catch (e) {
@@ -61,23 +45,31 @@ class AuthProvider with ChangeNotifier {
       notifyListeners();
       return false;
     } finally {
-      _isLoading = false;
-      notifyListeners();
+      setLoading(false);
     }
   }
 
-  // Register method
-  Future<bool> register(
-      String name, String email, String phone, String password, String role,
-      {Map<String, dynamic>? additionalInfo}) async {
-    _isLoading = true;
-    _error = null;
-    notifyListeners();
+  // Register
+  Future<bool> register({
+    required String firstName,
+    required String lastName,
+    required String email,
+    required String password,
+    required String phone,
+    String? citizenId,
+  }) async {
+    setLoading(true);
+    clearError();
 
     try {
-      _currentUser = await _authService.register(
-          name, email, phone, password, role,
-          additionalInfo: additionalInfo);
+      _user = await AuthService.register(
+        firstName: firstName,
+        lastName: lastName,
+        email: email,
+        password: password,
+        phone: phone,
+        citizenId: citizenId,
+      );
       notifyListeners();
       return true;
     } catch (e) {
@@ -85,131 +77,95 @@ class AuthProvider with ChangeNotifier {
       notifyListeners();
       return false;
     } finally {
-      _isLoading = false;
-      notifyListeners();
+      setLoading(false);
     }
   }
 
-  // Request password reset
-  Future<bool> requestPasswordReset(String email, String role) async {
-    _isLoading = true;
-    _error = null;
-    notifyListeners();
+  // Update Profile
+  Future<bool> updateProfile({
+    String? firstName,
+    String? lastName,
+    String? phone,
+    UserPreferences? preferences,
+  }) async {
+    setLoading(true);
+    clearError();
 
     try {
-      final success = await _authService.requestPasswordReset(email, role);
-      _error = null;
-      notifyListeners();
-      return success;
-    } catch (e) {
-      _error = e.toString();
-      notifyListeners();
-      return false;
-    } finally {
-      _isLoading = false;
-      notifyListeners();
-    }
-  }
-
-  // Reset password with token
-  Future<bool> resetPassword(String token, String password, String role) async {
-    _isLoading = true;
-    _error = null;
-    notifyListeners();
-
-    try {
-      final success = await _authService.resetPassword(token, password, role);
-      _error = null;
-      notifyListeners();
-      return success;
-    } catch (e) {
-      _error = e.toString();
-      notifyListeners();
-      return false;
-    } finally {
-      _isLoading = false;
-      notifyListeners();
-    }
-  }
-
-  // Change password (for logged in user)
-  Future<bool> changePassword(
-      String currentPassword, String newPassword) async {
-    _isLoading = true;
-    _error = null;
-    notifyListeners();
-
-    try {
-      final success =
-          await _authService.changePassword(currentPassword, newPassword);
-      _error = null;
-      notifyListeners();
-      return success;
-    } catch (e) {
-      _error = e.toString();
-      notifyListeners();
-      return false;
-    } finally {
-      _isLoading = false;
-      notifyListeners();
-    }
-  }
-
-  // Logout method
-  Future<bool> logout() async {
-    try {
-      final secureStorage = FlutterSecureStorage();
-      await secureStorage.delete(key: 'auth_token');
-
-      // Clear all cached data
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.clear();
-
-      _currentUser = null;
+      _user = await AuthService.updateProfile(
+        firstName: firstName,
+        lastName: lastName,
+        phone: phone,
+        preferences: preferences,
+      );
       notifyListeners();
       return true;
     } catch (e) {
-      print('Error during logout: $e');
+      _error = e.toString();
+      notifyListeners();
       return false;
+    } finally {
+      setLoading(false);
     }
   }
 
-  // Clear error method
+  // Refresh User Profile
+  Future<void> refreshProfile() async {
+    if (!isAuthenticated) return;
+
+    try {
+      _user = await AuthService.refreshUserProfile();
+      notifyListeners();
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+    }
+  }
+
+  // Verify Citizen ID
+  Future<bool> verifyCitizenId(String citizenId) async {
+    setLoading(true);
+    clearError();
+
+    try {
+      final isValid = await AuthService.verifyCitizenId(citizenId);
+      return isValid;
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // Logout
+  Future<void> logout() async {
+    setLoading(true);
+    try {
+      await AuthService.logout();
+      _user = null;
+      _isInitialized = false;
+    } catch (e) {
+      _error = e.toString();
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // Helper methods
+  void setLoading(bool loading) {
+    _isLoading = loading;
+    notifyListeners();
+  }
+
   void clearError() {
     _error = null;
     notifyListeners();
   }
 
-  // Validate token on app startup
-  Future<bool> validateTokenOnStartup() async {
-    _isLoading = true;
+  void setError(String error) {
+    _error = error;
     notifyListeners();
-
-    try {
-      final storage = const FlutterSecureStorage();
-      final token = await storage.read(key: 'auth_token');
-      final prefs = await SharedPreferences.getInstance();
-      final role = prefs.getString('user_role');
-
-      if (token == null || role == null) {
-        return false;
-      }
-
-      final isValid = await _authService.validateToken(token, role);
-
-      if (isValid) {
-        await initialize();
-      } else {
-        await logout();
-      }
-
-      return isValid;
-    } catch (e) {
-      await logout();
-      return false;
-    } finally {
-      _isLoading = false;
-      notifyListeners();
-    }
   }
 }

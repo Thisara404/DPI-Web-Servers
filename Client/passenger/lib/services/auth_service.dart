@@ -1,357 +1,145 @@
 import 'dart:convert';
-import 'dart:math';
-import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import '../../models/user.dart';
-import '../../models/driver.dart';
-import '../../models/passenger.dart';
-import '../../../config/api.endpoints.dart';
+import '../models/user.dart';
+import 'api_service.dart';
+import 'storage_service.dart';
 
 class AuthService {
-  // Login method
-  Future<User> login(String email, String password, String role) async {
+  static Future<User> login(String email, String password) async {
     try {
-      final endpoint = role == 'driver'
-          ? ApiEndpoints.driverLogin
-          : ApiEndpoints.passengerLogin;
-
-      final response = await http.post(
-        Uri.parse(endpoint),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'email': email,
-          'password': password,
-        }),
-      );
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-
-        // Add null safety checks here
-        if (data == null) {
-          throw Exception('Server returned null response');
-        }
-
-        if (data['status'] != true) {
-          throw Exception(data['message'] ?? 'Login failed');
-        }
-
-        // Extract token - check for various possible paths
-        final String? tokenData = data['token'] ?? data['data']?['token'];
-
-        if (tokenData == null) {
-          throw Exception('No authentication token received');
-        }
-
-        // Safely extract user data
-        final Map<String, dynamic> userData;
-        if (role == 'driver') {
-          userData = data['data']?['driver'] ?? data['data'] ?? {};
-        } else {
-          userData = data['data']?['passenger'] ?? data['data'] ?? {};
-        }
-
-        // Create user object with null safety
-        final user = User(
-          id: userData['_id'] ?? '',
-          name: userData['name'] ?? '',
-          email: userData['email'] ?? '',
-          phone: userData['phone'] ?? '',
-          role: role,
-          profileImageUrl: userData['image'],
-          token: tokenData,
-        );
-
-        // Save user data to local storage
-        await _saveUserData(user);
-
-        return user;
+      final response = await ApiService.login(email, password);
+      
+      if (response['success'] == true) {
+        final userData = response['user'];
+        final token = response['token'];
+        
+        // Store token and user data
+        await StorageService.saveToken(token);
+        await StorageService.saveUser(userData);
+        
+        return User.fromJson(userData);
       } else {
-        final errorData = jsonDecode(response.body);
-        throw Exception(errorData['message'] ??
-            'Login failed with status code ${response.statusCode}');
+        throw Exception(response['message'] ?? ErrorMessages.invalidCredentials);
       }
     } catch (e) {
-      throw Exception('Failed to login: $e');
+      throw Exception(e.toString());
     }
   }
 
-  // Register method - modified to login automatically after registration
-  Future<User> register(
-      String name, String email, String phone, String password, String role,
-      {Map<String, dynamic>? additionalInfo}) async {
+  static Future<User> register({
+    required String firstName,
+    required String lastName,
+    required String email,
+    required String password,
+    required String phone,
+    String? citizenId,
+  }) async {
     try {
-      final endpoint = role == 'driver'
-          ? ApiEndpoints.driverRegister
-          : ApiEndpoints.passengerRegister;
-
-      // Base registration data
-      final Map<String, dynamic> registrationData = {
-        'name': name,
+      final userData = {
+        'firstName': firstName,
+        'lastName': lastName,
         'email': email,
-        'phone': phone,
         'password': password,
+        'phone': phone,
+        if (citizenId != null) 'citizenId': citizenId,
       };
 
-      // Print debug info
-      print('Register role: $role');
-      print('Additional info: $additionalInfo');
-
-      // For driver, add bus details - handle both formats for flexibility
-      if (role == 'driver' && additionalInfo != null) {
-        if (additionalInfo.containsKey('busDetails')) {
-          // Use existing nested structure
-          registrationData['busDetails'] = additionalInfo['busDetails'];
-        } else {
-          // Use flat structure if that's what register screen provides
-          registrationData['busDetails'] = {
-            'busNumber': additionalInfo['vehicleNumber'] ??
-                additionalInfo['busNumber'] ??
-                '',
-            'busModel': additionalInfo['vehicleType'] ??
-                additionalInfo['busModel'] ??
-                '',
-            'busColor': additionalInfo['vehicleColor'] ??
-                additionalInfo['busColor'] ??
-                '',
-          };
-        }
-
-        registrationData['licenseNumber'] =
-            additionalInfo['licenseNumber'] ?? '';
-        registrationData['address'] = additionalInfo['address'] ?? '';
-      }
-
-      // For passenger, add addresses if provided
-      if (role == 'passenger' && additionalInfo != null) {
-        if (additionalInfo.containsKey('addresses')) {
-          registrationData['addresses'] = additionalInfo['addresses'];
-        }
-      }
-
-      print('Sending registration data: $registrationData');
-
-      final response = await http.post(
-        Uri.parse(endpoint),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode(registrationData),
-      );
-
-      print('Register response status: ${response.statusCode}');
-      print('Register response body: ${response.body}');
-
-      if (response.statusCode == 201) {
-        final data = jsonDecode(response.body);
-
-        if (!data['status']) {
-          throw Exception(data['message'] ?? 'Registration failed');
-        }
-
-        // Create user from response data
-        final userData = data['data'];
-
-        // Auto-login after successful registration
-        return await login(email, password, role);
+      final response = await ApiService.register(userData);
+      
+      if (response['success'] == true) {
+        final user = response['user'];
+        final token = response['token'];
+        
+        // Store token and user data
+        await StorageService.saveToken(token);
+        await StorageService.saveUser(user);
+        
+        return User.fromJson(user);
       } else {
-        final error = jsonDecode(response.body);
-        throw Exception(error['message'] ?? 'Registration failed');
+        throw Exception(response['message'] ?? 'Registration failed');
       }
     } catch (e) {
-      throw Exception('Failed to register: $e');
+      throw Exception(e.toString());
     }
   }
 
-  // Request password reset
-  Future<bool> requestPasswordReset(String email, String role) async {
+  static Future<User?> getCurrentUser() async {
     try {
-      final endpoint = role == 'driver'
-          ? ApiEndpoints.driverForgotPassword
-          : ApiEndpoints.passengerForgotPassword;
-
-      final response = await http.post(
-        Uri.parse(endpoint),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'email': email,
-        }),
-      );
-
-      final data = jsonDecode(response.body);
-      return data['status'] == true;
-    } catch (e) {
-      throw Exception('Failed to request password reset: $e');
-    }
-  }
-
-  // Reset password with token
-  Future<bool> resetPassword(String token, String password, String role) async {
-    try {
-      final endpoint = role == 'driver'
-          ? ApiEndpoints.driverResetPassword
-          : ApiEndpoints.passengerResetPassword;
-
-      final response = await http.post(
-        Uri.parse(endpoint),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'token': token,
-          'password': password,
-        }),
-      );
-
-      final data = jsonDecode(response.body);
-      return data['status'] == true;
-    } catch (e) {
-      throw Exception('Failed to reset password: $e');
-    }
-  }
-
-  // Change password for logged in user
-  Future<bool> changePassword(
-      String currentPassword, String newPassword) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('user_token');
-
-      if (token == null) {
-        throw Exception('No authentication token found');
+      final userData = await StorageService.getUser();
+      if (userData != null) {
+        return User.fromJson(userData);
       }
-
-      final response = await http.put(
-        Uri.parse(ApiEndpoints.changePassword),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-        body: jsonEncode({
-          'currentPassword': currentPassword,
-          'newPassword': newPassword,
-        }),
-      );
-
-      final data = jsonDecode(response.body);
-      return data['status'] == true;
+      return null;
     } catch (e) {
-      throw Exception('Failed to change password: $e');
+      return null;
     }
   }
 
-  // Logout method - just clears local storage
-  Future<void> logout() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('user');
-  }
-
-  // Get current user from shared preferences
-  Future<User?> getCurrentUser() async {
-    final prefs = await SharedPreferences.getInstance();
-    final userData = prefs.getString('user');
-
-    if (userData != null) {
-      return User.fromJson(jsonDecode(userData));
-    }
-
-    return null;
-  }
-
-  // Save user data to shared preferences
-  Future<void> _saveUserData(User user) async {
-    final prefs = await SharedPreferences.getInstance();
-    final storage = const FlutterSecureStorage();
-
-    // Store token in secure storage
-    await storage.write(key: 'auth_token', value: user.token);
-    print(
-        'Saved token to secure storage: ${user.token?.substring(0, 10) ?? 'null'}...');
-
-    // Store complete user data as JSON
-    await prefs.setString('user', jsonEncode(user.toJson()));
-
-    // Also store individual fields for convenience
-    await prefs.setString('user_id', user.id);
-    await prefs.setString('user_name', user.name);
-    await prefs.setString('user_email', user.email);
-    await prefs.setString('user_role', user.role);
-  }
-
-  // Get specific user profile (driver or passenger)
-  Future<dynamic> getUserProfile(String role) async {
+  static Future<User> refreshUserProfile() async {
     try {
-      // Get token from storage
-      final storage = const FlutterSecureStorage();
-      final token = await storage.read(key: 'auth_token');
-      final prefs = await SharedPreferences.getInstance();
-
-      print(
-          'Getting $role profile with token: ${token != null ? "${token.substring(0, min(15, token.length))}..." : "null"}');
-
-      if (token == null) {
-        throw Exception('Authentication token not found');
-      }
-
-      final endpoint = role == 'driver'
-          ? ApiEndpoints.driverProfile
-          : ApiEndpoints.passengerProfile;
-
-      final response = await http.get(
-        Uri.parse(endpoint),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-      );
-
-      print('Profile response status: ${response.statusCode}');
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-
-        if (data['status'] != true) {
-          throw Exception(data['message'] ?? 'Failed to get user profile');
-        }
-
-        if (role == 'driver') {
-          return Driver.fromJson(data['data']);
-        } else {
-          return Passenger.fromJson(data['data']);
-        }
-      } else if (response.statusCode == 401 || response.statusCode == 403) {
-        // Handle both 401 (Unauthorized) and 403 (Forbidden) as session expiry
-        await storage.delete(key: 'auth_token');
-        await prefs.remove('user');
-        throw Exception(
-            'Your session has expired or you are not authorized. Please log in again.');
+      final response = await ApiService.getProfile();
+      
+      if (response['success'] == true) {
+        final userData = response['user'];
+        
+        // Update stored user data
+        await StorageService.saveUser(userData);
+        
+        return User.fromJson(userData);
       } else {
-        throw Exception(
-            'Failed to get user profile: Server returned ${response.statusCode}');
+        throw Exception(response['message'] ?? 'Failed to fetch profile');
       }
     } catch (e) {
-      print('Error in getUserProfile: $e');
-      rethrow;
+      throw Exception(e.toString());
     }
   }
 
-  // Validate token
-  Future<bool> validateToken(String token, String role) async {
+  static Future<User> updateProfile({
+    String? firstName,
+    String? lastName,
+    String? phone,
+    UserPreferences? preferences,
+  }) async {
     try {
-      final endpoint = role == 'driver'
-          ? ApiEndpoints.driverValidateToken
-          : ApiEndpoints.passengerValidateToken;
+      final updateData = <String, dynamic>{};
+      
+      if (firstName != null) updateData['firstName'] = firstName;
+      if (lastName != null) updateData['lastName'] = lastName;
+      if (phone != null) updateData['phone'] = phone;
+      if (preferences != null) updateData['preferences'] = preferences.toJson();
 
-      final response = await http.get(
-        Uri.parse(endpoint),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-      );
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        return data['status'] == true;
+      final response = await ApiService.updateProfile(updateData);
+      
+      if (response['success'] == true) {
+        final userData = response['user'];
+        
+        // Update stored user data
+        await StorageService.saveUser(userData);
+        
+        return User.fromJson(userData);
+      } else {
+        throw Exception(response['message'] ?? 'Failed to update profile');
       }
-      return false;
+    } catch (e) {
+      throw Exception(e.toString());
+    }
+  }
+
+  static Future<bool> isAuthenticated() async {
+    final token = await StorageService.getToken();
+    return token != null;
+  }
+
+  static Future<void> logout() async {
+    await StorageService.clearAll();
+  }
+
+  // SLUDI Verification (placeholder - implement based on your server)
+  static Future<bool> verifyCitizenId(String citizenId) async {
+    try {
+      // This would call your server's SLUDI verification endpoint
+      // For now, returning true as placeholder
+      await Future.delayed(const Duration(seconds: 2)); // Simulate API call
+      return true;
     } catch (e) {
       return false;
     }

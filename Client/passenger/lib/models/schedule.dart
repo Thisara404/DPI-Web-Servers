@@ -38,8 +38,10 @@ class Schedule {
   });
 
   Duration get journeyDuration => arrivalTime.difference(departureTime);
-  bool get isAvailable => availableSeats > 0 && status == JourneyStatus.scheduled;
-  double get occupancyRate => ((totalSeats - availableSeats) / totalSeats) * 100;
+  bool get isAvailable =>
+      availableSeats > 0 && status == JourneyStatus.scheduled;
+  double get occupancyRate =>
+      ((totalSeats - availableSeats) / totalSeats) * 100;
 
   factory Schedule.fromJson(Map<String, dynamic> json) {
     return Schedule(
@@ -59,8 +61,9 @@ class Schedule {
         orElse: () => JourneyStatus.scheduled,
       ),
       stops: (json['stops'] as List?)
-          ?.map((stop) => BusStop.fromJson(stop))
-          .toList() ?? [],
+              ?.map((stop) => BusStop.fromJson(stop))
+              .toList() ??
+          [],
       driverId: json['driverId'],
       driverName: json['driverName'],
       driverPhone: json['driverPhone'],

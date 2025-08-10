@@ -33,7 +33,7 @@ class User {
       citizenId: json['citizenId'],
       isVerified: json['isVerified'] ?? false,
       createdAt: DateTime.parse(json['createdAt']),
-      preferences: json['preferences'] != null 
+      preferences: json['preferences'] != null
           ? UserPreferences.fromJson(json['preferences'])
           : null,
     );
