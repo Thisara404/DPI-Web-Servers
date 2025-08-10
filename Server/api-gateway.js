@@ -301,6 +301,8 @@ app.use('/api/passenger/auth', createProxy('http://localhost:4002', {
   '^/api/passenger/auth': '/api/auth'
 }));
 
+app.use('/api/map', createProxy('http://localhost:4002'));
+
 // NDX (National Data Exchange) Routes  
 app.use('/api/routes', createProxy('http://localhost:3002'));
 app.use('/api/journeys', createProxy('http://localhost:3002'));
