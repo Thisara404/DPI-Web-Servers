@@ -8,10 +8,10 @@ import 'services/storage_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   // Initialize storage service
   await StorageService.init();
-  
+
   runApp(
     MultiProvider(
       providers: [

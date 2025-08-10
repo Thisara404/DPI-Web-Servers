@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
+import 'package:connectivity_plus/connectivity_plus.dart';
 import '../constants.dart';
 import 'storage_service.dart';
 
@@ -23,6 +24,15 @@ class ApiService {
     return headers;
   }
 
+  static Future<bool> _checkConnectivity() async {
+    try {
+      final connectivityResult = await Connectivity().checkConnectivity();
+      return connectivityResult != ConnectivityResult.none;
+    } catch (e) {
+      return false;
+    }
+  }
+
   // Generic HTTP request method
   static Future<Map<String, dynamic>> _makeRequest(
     String method,
@@ -32,34 +42,38 @@ class ApiService {
   }) async {
     try {
       final uri = Uri.parse('$_baseUrl$endpoint');
-      final uriWithQuery = queryParams != null 
-          ? uri.replace(queryParameters: queryParams)
-          : uri;
+      final uriWithQuery =
+          queryParams != null ? uri.replace(queryParameters: queryParams) : uri;
 
       final headers = await _getHeaders();
       late http.Response response;
 
       switch (method.toUpperCase()) {
         case 'GET':
-          response = await http.get(uriWithQuery, headers: headers)
-              .timeout(_timeout);
+          response =
+              await http.get(uriWithQuery, headers: headers).timeout(_timeout);
           break;
         case 'POST':
-          response = await http.post(
-            uriWithQuery,
-            headers: headers,
-            body: data != null ? jsonEncode(data) : null,
-          ).timeout(_timeout);
+          response = await http
+              .post(
+                uriWithQuery,
+                headers: headers,
+                body: data != null ? jsonEncode(data) : null,
+              )
+              .timeout(_timeout);
           break;
         case 'PUT':
-          response = await http.put(
-            uriWithQuery,
-            headers: headers,
-            body: data != null ? jsonEncode(data) : null,
-          ).timeout(_timeout);
+          response = await http
+              .put(
+                uriWithQuery,
+                headers: headers,
+                body: data != null ? jsonEncode(data) : null,
+              )
+              .timeout(_timeout);
           break;
         case 'DELETE':
-          response = await http.delete(uriWithQuery, headers: headers)
+          response = await http
+              .delete(uriWithQuery, headers: headers)
               .timeout(_timeout);
           break;
         default:
@@ -98,20 +112,45 @@ class ApiService {
       case 500:
         throw Exception(ErrorMessages.serverError);
       default:
-        throw Exception('HTTP ${response.statusCode}: ${data['message'] ?? 'Unknown error'}');
+        throw Exception(
+            'HTTP ${response.statusCode}: ${data['message'] ?? 'Unknown error'}');
     }
   }
 
   // Authentication Methods
-  static Future<Map<String, dynamic>> login(String email, String password) async {
-    final data = {
-      'email': email,
-      'password': password,
-    };
-    return _makeRequest('POST', ApiConstants.loginEndpoint, data: data);
+  static Future<Map<String, dynamic>> login(
+      String email, String password) async {
+    try {
+      // Check connectivity first
+      if (!await _checkConnectivity()) {
+        return {
+          'success': false,
+          'message':
+              'No internet connection. Please check your network and try again.',
+        };
+      }
+
+      final data = {
+        'email': email,
+        'password': password,
+      };
+      return _makeRequest('POST', ApiConstants.loginEndpoint, data: data);
+    } on SocketException {
+      return {
+        'success': false,
+        'message':
+            'Unable to connect to server. Please check your internet connection.',
+      };
+    } catch (e) {
+      return {
+        'success': false,
+        'message': 'An error occurred: ${e.toString()}',
+      };
+    }
   }
 
-  static Future<Map<String, dynamic>> register(Map<String, dynamic> userData) async {
+  static Future<Map<String, dynamic>> register(
+      Map<String, dynamic> userData) async {
     return _makeRequest('POST', ApiConstants.registerEndpoint, data: userData);
   }
 
@@ -119,7 +158,8 @@ class ApiService {
     return _makeRequest('GET', ApiConstants.profileEndpoint);
   }
 
-  static Future<Map<String, dynamic>> updateProfile(Map<String, dynamic> userData) async {
+  static Future<Map<String, dynamic>> updateProfile(
+      Map<String, dynamic> userData) async {
     return _makeRequest('PUT', ApiConstants.profileEndpoint, data: userData);
   }
 
@@ -128,37 +168,49 @@ class ApiService {
     return _makeRequest('GET', ApiConstants.activeSchedulesEndpoint);
   }
 
-  static Future<Map<String, dynamic>> searchSchedules(Map<String, String> filters) async {
-    return _makeRequest('GET', ApiConstants.searchSchedulesEndpoint, queryParams: filters);
+  static Future<Map<String, dynamic>> searchSchedules(
+      Map<String, String> filters) async {
+    return _makeRequest('GET', ApiConstants.searchSchedulesEndpoint,
+        queryParams: filters);
   }
 
-  static Future<Map<String, dynamic>> getScheduleDetails(String scheduleId) async {
+  static Future<Map<String, dynamic>> getScheduleDetails(
+      String scheduleId) async {
     return _makeRequest('GET', '${ApiConstants.schedulesEndpoint}/$scheduleId');
   }
 
-  static Future<Map<String, dynamic>> getScheduleRoute(String scheduleId) async {
-    return _makeRequest('GET', '${ApiConstants.schedulesEndpoint}/$scheduleId/route');
+  static Future<Map<String, dynamic>> getScheduleRoute(
+      String scheduleId) async {
+    return _makeRequest(
+        'GET', '${ApiConstants.schedulesEndpoint}/$scheduleId/route');
   }
 
   // Booking Methods
-  static Future<Map<String, dynamic>> createBooking(Map<String, dynamic> bookingData) async {
-    return _makeRequest('POST', ApiConstants.bookingsEndpoint, data: bookingData);
+  static Future<Map<String, dynamic>> createBooking(
+      Map<String, dynamic> bookingData) async {
+    return _makeRequest('POST', ApiConstants.bookingsEndpoint,
+        data: bookingData);
   }
 
   static Future<Map<String, dynamic>> getBookings() async {
     return _makeRequest('GET', ApiConstants.bookingsEndpoint);
   }
 
-  static Future<Map<String, dynamic>> getBookingDetails(String bookingId) async {
+  static Future<Map<String, dynamic>> getBookingDetails(
+      String bookingId) async {
     return _makeRequest('GET', '${ApiConstants.bookingsEndpoint}/$bookingId');
   }
 
   static Future<Map<String, dynamic>> cancelBooking(String bookingId) async {
-    return _makeRequest('PUT', '${ApiConstants.bookingsEndpoint}/$bookingId/cancel');
+    return _makeRequest(
+        'PUT', '${ApiConstants.bookingsEndpoint}/$bookingId/cancel');
   }
 
-  static Future<Map<String, dynamic>> processPayment(String bookingId, Map<String, dynamic> paymentData) async {
-    return _makeRequest('POST', '${ApiConstants.bookingsEndpoint}/$bookingId/payment', data: paymentData);
+  static Future<Map<String, dynamic>> processPayment(
+      String bookingId, Map<String, dynamic> paymentData) async {
+    return _makeRequest(
+        'POST', '${ApiConstants.bookingsEndpoint}/$bookingId/payment',
+        data: paymentData);
   }
 
   // Ticket Methods
@@ -171,12 +223,14 @@ class ApiService {
   }
 
   static Future<Map<String, dynamic>> getTicketQR(String ticketId) async {
-    return _makeRequest('GET', '${ApiConstants.ticketsEndpoint}/$ticketId${ApiConstants.qrCodeEndpoint}');
+    return _makeRequest('GET',
+        '${ApiConstants.ticketsEndpoint}/$ticketId${ApiConstants.qrCodeEndpoint}');
   }
 
   static Future<Map<String, dynamic>> validateTicket(String qrCode) async {
     final data = {'qrCode': qrCode};
-    return _makeRequest('POST', ApiConstants.validateTicketEndpoint, data: data);
+    return _makeRequest('POST', ApiConstants.validateTicketEndpoint,
+        data: data);
   }
 
   // Map Methods
@@ -188,21 +242,39 @@ class ApiService {
     return _makeRequest('GET', ApiConstants.liveBusesEndpoint);
   }
 
-  static Future<Map<String, dynamic>> getNearbyStops(double latitude, double longitude) async {
+  static Future<Map<String, dynamic>> getNearbyStops(
+      double latitude, double longitude) async {
     final queryParams = {
       'latitude': latitude.toString(),
       'longitude': longitude.toString(),
     };
-    return _makeRequest('GET', ApiConstants.nearbyStopsEndpoint, queryParams: queryParams);
+    return _makeRequest('GET', ApiConstants.nearbyStopsEndpoint,
+        queryParams: queryParams);
   }
 
   // Passenger Dashboard Methods
   static Future<Map<String, dynamic>> getDashboard() async {
-    return _makeRequest('GET', ApiConstants.dashboardEndpoint);
+    try {
+      if (!await _checkConnectivity()) {
+        return {
+          'success': false,
+          'message': 'No internet connection',
+        };
+      }
+
+      return _makeRequest('GET', ApiConstants.dashboardEndpoint);
+    } catch (e) {
+      return {
+        'success': false,
+        'message': e.toString(),
+      };
+    }
   }
 
-  static Future<Map<String, dynamic>> getTravelHistory(Map<String, String>? filters) async {
-    return _makeRequest('GET', ApiConstants.historyEndpoint, queryParams: filters);
+  static Future<Map<String, dynamic>> getTravelHistory(
+      Map<String, String>? filters) async {
+    return _makeRequest('GET', ApiConstants.historyEndpoint,
+        queryParams: filters);
   }
 
   static Future<Map<String, dynamic>> getFavorites() async {
@@ -219,16 +291,21 @@ class ApiService {
   }
 
   // Tracking Methods
-  static Future<Map<String, dynamic>> subscribeToTracking(String scheduleId) async {
+  static Future<Map<String, dynamic>> subscribeToTracking(
+      String scheduleId) async {
     final data = {'scheduleId': scheduleId};
-    return _makeRequest('POST', ApiConstants.trackingSubscribeEndpoint, data: data);
+    return _makeRequest('POST', ApiConstants.trackingSubscribeEndpoint,
+        data: data);
   }
 
-  static Future<Map<String, dynamic>> getTrackingStatus(String scheduleId) async {
-    return _makeRequest('GET', '${ApiConstants.trackingStatusEndpoint}/$scheduleId/status');
+  static Future<Map<String, dynamic>> getTrackingStatus(
+      String scheduleId) async {
+    return _makeRequest(
+        'GET', '${ApiConstants.trackingStatusEndpoint}/$scheduleId/status');
   }
 
   static Future<Map<String, dynamic>> getETA(String scheduleId) async {
-    return _makeRequest('GET', '${ApiConstants.trackingStatusEndpoint}/$scheduleId${ApiConstants.etaEndpoint}');
+    return _makeRequest('GET',
+        '${ApiConstants.trackingStatusEndpoint}/$scheduleId${ApiConstants.etaEndpoint}');
   }
 }

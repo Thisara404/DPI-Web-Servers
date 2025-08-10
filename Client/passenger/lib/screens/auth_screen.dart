@@ -14,29 +14,26 @@ class _AuthScreenState extends State<AuthScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   final _loginFormKey = GlobalKey<FormState>();
-  final _registerFormKey = GlobalKey<FormState>();
 
   // Login controllers
   final _loginEmailController = TextEditingController();
   final _loginPasswordController = TextEditingController();
 
-  // Register controllers
-  final _registerEmailController = TextEditingController();
-  final _registerPasswordController = TextEditingController();
-  final _confirmPasswordController = TextEditingController();
-  final _firstNameController = TextEditingController();
-  final _lastNameController = TextEditingController();
-  final _phoneController = TextEditingController();
-  final _citizenIdController = TextEditingController();
-
   bool _obscureLoginPassword = true;
-  bool _obscureRegisterPassword = true;
-  bool _obscureConfirmPassword = true;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+
+    // Initialize auth provider
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      try {
+        context.read<AuthProvider>().initialize();
+      } catch (e) {
+        print('❌ Error initializing AuthProvider: $e');
+      }
+    });
   }
 
   @override
@@ -44,13 +41,6 @@ class _AuthScreenState extends State<AuthScreen>
     _tabController.dispose();
     _loginEmailController.dispose();
     _loginPasswordController.dispose();
-    _registerEmailController.dispose();
-    _registerPasswordController.dispose();
-    _confirmPasswordController.dispose();
-    _firstNameController.dispose();
-    _lastNameController.dispose();
-    _phoneController.dispose();
-    _citizenIdController.dispose();
     super.dispose();
   }
 
@@ -61,20 +51,28 @@ class _AuthScreenState extends State<AuthScreen>
       body: SafeArea(
         child: Consumer<AuthProvider>(
           builder: (context, authProvider, child) {
-            return Column(
-              children: [
-                _buildHeader(),
-                _buildTabBar(),
-                Expanded(
-                  child: TabBarView(
-                    controller: _tabController,
-                    children: [
-                      _buildLoginTab(authProvider),
-                      _buildRegisterTab(authProvider),
-                    ],
-                  ),
+            return SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
+                  children: [
+                    _buildHeader(),
+                    const SizedBox(height: 32),
+                    _buildTabBar(),
+                    const SizedBox(height: 24),
+                    SizedBox(
+                      height: 600,
+                      child: TabBarView(
+                        controller: _tabController,
+                        children: [
+                          _buildLoginTab(authProvider),
+                          _buildRegisterTab(authProvider),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             );
           },
         ),
@@ -83,57 +81,55 @@ class _AuthScreenState extends State<AuthScreen>
   }
 
   Widget _buildHeader() {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        children: [
-          Container(
-            width: 80,
-            height: 80,
-            decoration: BoxDecoration(
-              color: AppTheme.accentColor,
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: const Icon(
-              Icons.directions_bus,
-              size: 40,
-              color: Colors.white,
-            ),
+    return Column(
+      children: [
+        Container(
+          width: 80,
+          height: 80,
+          decoration: BoxDecoration(
+            color: AppTheme.accentColor,
+            borderRadius: BorderRadius.circular(20),
           ),
-          const SizedBox(height: 16),
-          const Text(
-            'TransitLanka',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 28,
-              fontWeight: FontWeight.bold,
-            ),
+          child: const Icon(
+            Icons.directions_bus,
+            color: Colors.white,
+            size: 40,
           ),
-          const SizedBox(height: 8),
-          Text(
-            'Your smart bus companion',
-            style: TextStyle(
-              color: AppTheme.textSecondary,
-              fontSize: 16,
-            ),
+        ),
+        const SizedBox(height: 16),
+        const Text(
+          'TransitLanka',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 28,
+            fontWeight: FontWeight.bold,
           ),
-        ],
-      ),
+        ),
+        const SizedBox(height: 8),
+        const Text(
+          'Your smart bus companion',
+          style: TextStyle(
+            color: AppTheme.textSecondary,
+            fontSize: 16,
+          ),
+        ),
+      ],
     );
   }
 
   Widget _buildTabBar() {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 24),
       decoration: BoxDecoration(
         color: AppTheme.cardColor,
         borderRadius: BorderRadius.circular(8),
       ),
       child: TabBar(
         controller: _tabController,
-        indicatorColor: AppTheme.accentColor,
-        indicatorWeight: 3,
-        labelColor: AppTheme.accentColor,
+        indicator: BoxDecoration(
+          color: AppTheme.accentColor,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        labelColor: Colors.white,
         unselectedLabelColor: AppTheme.textSecondary,
         tabs: const [
           Tab(text: 'Login'),
@@ -152,14 +148,16 @@ class _AuthScreenState extends State<AuthScreen>
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const SizedBox(height: 24),
+
+            // Email field
             TextFormField(
               controller: _loginEmailController,
               style: const TextStyle(color: Colors.white),
               keyboardType: TextInputType.emailAddress,
               decoration: InputDecoration(
                 labelText: 'Email',
-                labelStyle: TextStyle(color: AppTheme.textSecondary),
-                prefixIcon: Icon(Icons.email, color: AppTheme.textSecondary),
+                labelStyle: const TextStyle(color: AppTheme.textSecondary),
+                prefixIcon: const Icon(Icons.email, color: AppTheme.textSecondary),
                 filled: true,
                 fillColor: AppTheme.cardColor,
                 border: OutlineInputBorder(
@@ -168,33 +166,33 @@ class _AuthScreenState extends State<AuthScreen>
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(color: AppTheme.accentColor),
+                  borderSide: const BorderSide(color: AppTheme.accentColor),
                 ),
               ),
               validator: (value) {
                 if (value == null || value.isEmpty) {
                   return 'Please enter your email';
                 }
-                if (!value.contains('@')) {
+                if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
                   return 'Please enter a valid email';
                 }
                 return null;
               },
             ),
             const SizedBox(height: 16),
+
+            // Password field
             TextFormField(
               controller: _loginPasswordController,
               style: const TextStyle(color: Colors.white),
               obscureText: _obscureLoginPassword,
               decoration: InputDecoration(
                 labelText: 'Password',
-                labelStyle: TextStyle(color: AppTheme.textSecondary),
-                prefixIcon: Icon(Icons.lock, color: AppTheme.textSecondary),
+                labelStyle: const TextStyle(color: AppTheme.textSecondary),
+                prefixIcon: const Icon(Icons.lock, color: AppTheme.textSecondary),
                 suffixIcon: IconButton(
                   icon: Icon(
-                    _obscureLoginPassword
-                        ? Icons.visibility
-                        : Icons.visibility_off,
+                    _obscureLoginPassword ? Icons.visibility : Icons.visibility_off,
                     color: AppTheme.textSecondary,
                   ),
                   onPressed: () {
@@ -211,7 +209,7 @@ class _AuthScreenState extends State<AuthScreen>
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(color: AppTheme.accentColor),
+                  borderSide: const BorderSide(color: AppTheme.accentColor),
                 ),
               ),
               validator: (value) {
@@ -222,41 +220,45 @@ class _AuthScreenState extends State<AuthScreen>
               },
             ),
             const SizedBox(height: 24),
-            SizedBox(
-              height: 50,
-              child: ElevatedButton(
-                onPressed: authProvider.isLoading
-                    ? null
-                    : () => _handleLogin(authProvider),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.accentColor,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
+
+            // Login button
+            ElevatedButton(
+              onPressed: authProvider.isLoading
+                  ? null
+                  : () => _handleLogin(authProvider),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.accentColor,
+                foregroundColor: Colors.white,
+                minimumSize: const Size(double.infinity, 48),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
                 ),
-                child: authProvider.isLoading
-                    ? const CircularProgressIndicator(color: Colors.white)
-                    : const Text(
-                        'Login',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
               ),
+              child: authProvider.isLoading
+                  ? const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    )
+                  : const Text('Login'),
             ),
             const SizedBox(height: 16),
+
+            // Forgot password
             TextButton(
               onPressed: () {
-                // Handle forgot password
                 _showForgotPasswordDialog();
               },
-              child: Text(
+              child: const Text(
                 'Forgot Password?',
                 style: TextStyle(color: AppTheme.accentColor),
               ),
             ),
+
+            // Error display
             if (authProvider.error != null) ...[
               const SizedBox(height: 16),
               Container(
@@ -266,9 +268,22 @@ class _AuthScreenState extends State<AuthScreen>
                   border: Border.all(color: AppTheme.errorRed),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Text(
-                  authProvider.error!,
-                  style: TextStyle(color: AppTheme.errorRed),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(
+                      Icons.error_outline,
+                      color: AppTheme.errorRed,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        authProvider.error!,
+                        style: const TextStyle(color: AppTheme.errorRed),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -279,281 +294,10 @@ class _AuthScreenState extends State<AuthScreen>
   }
 
   Widget _buildRegisterTab(AuthProvider authProvider) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
-      child: Form(
-        key: _registerFormKey,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const SizedBox(height: 24),
-            Row(
-              children: [
-                Expanded(
-                  child: TextFormField(
-                    controller: _firstNameController,
-                    style: const TextStyle(color: Colors.white),
-                    decoration: InputDecoration(
-                      labelText: 'First Name',
-                      labelStyle: TextStyle(color: AppTheme.textSecondary),
-                      filled: true,
-                      fillColor: AppTheme.cardColor,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: BorderSide.none,
-                      ),
-                    ),
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Required';
-                      }
-                      return null;
-                    },
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: TextFormField(
-                    controller: _lastNameController,
-                    style: const TextStyle(color: Colors.white),
-                    decoration: InputDecoration(
-                      labelText: 'Last Name',
-                      labelStyle: TextStyle(color: AppTheme.textSecondary),
-                      filled: true,
-                      fillColor: AppTheme.cardColor,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: BorderSide.none,
-                      ),
-                    ),
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Required';
-                      }
-                      return null;
-                    },
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _registerEmailController,
-              style: const TextStyle(color: Colors.white),
-              keyboardType: TextInputType.emailAddress,
-              decoration: InputDecoration(
-                labelText: 'Email',
-                labelStyle: TextStyle(color: AppTheme.textSecondary),
-                prefixIcon: Icon(Icons.email, color: AppTheme.textSecondary),
-                filled: true,
-                fillColor: AppTheme.cardColor,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide.none,
-                ),
-              ),
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Please enter your email';
-                }
-                if (!value.contains('@')) {
-                  return 'Please enter a valid email';
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _phoneController,
-              style: const TextStyle(color: Colors.white),
-              keyboardType: TextInputType.phone,
-              decoration: InputDecoration(
-                labelText: 'Phone Number',
-                labelStyle: TextStyle(color: AppTheme.textSecondary),
-                prefixIcon: Icon(Icons.phone, color: AppTheme.textSecondary),
-                filled: true,
-                fillColor: AppTheme.cardColor,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide.none,
-                ),
-              ),
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Please enter your phone number';
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _citizenIdController,
-              style: const TextStyle(color: Colors.white),
-              decoration: InputDecoration(
-                labelText: 'Citizen ID (Optional)',
-                labelStyle: TextStyle(color: AppTheme.textSecondary),
-                prefixIcon: Icon(Icons.badge, color: AppTheme.textSecondary),
-                filled: true,
-                fillColor: AppTheme.cardColor,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide.none,
-                ),
-                helperText: 'For SLUDI verification',
-                helperStyle:
-                    TextStyle(color: AppTheme.textSecondary, fontSize: 12),
-              ),
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _registerPasswordController,
-              style: const TextStyle(color: Colors.white),
-              obscureText: _obscureRegisterPassword,
-              decoration: InputDecoration(
-                labelText: 'Password',
-                labelStyle: TextStyle(color: AppTheme.textSecondary),
-                prefixIcon: Icon(Icons.lock, color: AppTheme.textSecondary),
-                suffixIcon: IconButton(
-                  icon: Icon(
-                    _obscureRegisterPassword
-                        ? Icons.visibility
-                        : Icons.visibility_off,
-                    color: AppTheme.textSecondary,
-                  ),
-                  onPressed: () {
-                    setState(() {
-                      _obscureRegisterPassword = !_obscureRegisterPassword;
-                    });
-                  },
-                ),
-                filled: true,
-                fillColor: AppTheme.cardColor,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide.none,
-                ),
-              ),
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Please enter a password';
-                }
-                if (value.length < 8) {
-                  return 'Password must be at least 8 characters';
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _confirmPasswordController,
-              style: const TextStyle(color: Colors.white),
-              obscureText: _obscureConfirmPassword,
-              decoration: InputDecoration(
-                labelText: 'Confirm Password',
-                labelStyle: TextStyle(color: AppTheme.textSecondary),
-                prefixIcon: Icon(Icons.lock, color: AppTheme.textSecondary),
-                suffixIcon: IconButton(
-                  icon: Icon(
-                    _obscureConfirmPassword
-                        ? Icons.visibility
-                        : Icons.visibility_off,
-                    color: AppTheme.textSecondary,
-                  ),
-                  onPressed: () {
-                    setState(() {
-                      _obscureConfirmPassword = !_obscureConfirmPassword;
-                    });
-                  },
-                ),
-                filled: true,
-                fillColor: AppTheme.cardColor,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide.none,
-                ),
-              ),
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Please confirm your password';
-                }
-                if (value != _registerPasswordController.text) {
-                  return 'Passwords do not match';
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 24),
-            SizedBox(
-              height: 50,
-              child: ElevatedButton(
-                onPressed: authProvider.isLoading
-                    ? null
-                    : () => _handleRegister(authProvider),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.accentColor,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-                child: authProvider.isLoading
-                    ? const CircularProgressIndicator(color: Colors.white)
-                    : const Text(
-                        'Create Account',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            if (authProvider.error != null) ...[
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: AppTheme.errorRed.withOpacity(0.1),
-                  border: Border.all(color: AppTheme.errorRed),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  authProvider.error!,
-                  style: TextStyle(color: AppTheme.errorRed),
-                ),
-              ),
-              const SizedBox(height: 16),
-            ],
-            // Terms & Conditions
-            RichText(
-              textAlign: TextAlign.center,
-              text: TextSpan(
-                style: TextStyle(
-                  color: AppTheme.textSecondary,
-                  fontSize: 12,
-                ),
-                children: [
-                  const TextSpan(
-                      text: 'By creating an account, you agree to our '),
-                  TextSpan(
-                    text: 'Terms & Conditions',
-                    style: TextStyle(
-                      color: AppTheme.accentColor,
-                      decoration: TextDecoration.underline,
-                    ),
-                  ),
-                  const TextSpan(text: ' and '),
-                  TextSpan(
-                    text: 'Privacy Policy',
-                    style: TextStyle(
-                      color: AppTheme.accentColor,
-                      decoration: TextDecoration.underline,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+    return const Center(
+      child: Text(
+        'Register functionality will be implemented here',
+        style: TextStyle(color: Colors.white),
       ),
     );
   }
@@ -561,107 +305,51 @@ class _AuthScreenState extends State<AuthScreen>
   void _handleLogin(AuthProvider authProvider) async {
     if (!_loginFormKey.currentState!.validate()) return;
 
-    final success = await authProvider.login(
-      _loginEmailController.text.trim(),
-      _loginPasswordController.text,
-    );
+    try {
+      print('🔐 AuthScreen: Handling login...');
 
-    if (success && mounted) {
-      // Navigate to home screen
-      Navigator.of(context).pushReplacementNamed('/home');
-    }
-  }
-
-  void _handleRegister(AuthProvider authProvider) async {
-    if (!_registerFormKey.currentState!.validate()) return;
-
-    final success = await authProvider.register(
-      firstName: _firstNameController.text.trim(),
-      lastName: _lastNameController.text.trim(),
-      email: _registerEmailController.text.trim(),
-      phone: _phoneController.text.trim(),
-      password: _registerPasswordController.text,
-      citizenId: _citizenIdController.text.trim().isNotEmpty
-          ? _citizenIdController.text.trim()
-          : null,
-    );
-
-    if (success && mounted) {
-      // Show success message
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            authProvider.user?.isVerified == true
-                ? 'Account created and verified successfully!'
-                : 'Account created! Please verify your Citizen ID for full access.',
-          ),
-          backgroundColor: AppTheme.successGreen,
-          duration: const Duration(seconds: 3),
-        ),
+      final success = await authProvider.login(
+        _loginEmailController.text.trim(),
+        _loginPasswordController.text,
       );
 
-      // Navigate to home screen
-      Navigator.of(context).pushReplacementNamed('/home');
+      if (success && mounted) {
+        print('✅ AuthScreen: Login successful, navigating to home...');
+        // Navigate to home screen
+        Navigator.of(context).pushReplacementNamed('/home');
+      } else {
+        print('❌ AuthScreen: Login failed');
+      }
+    } catch (e, stackTrace) {
+      print('❌ AuthScreen: Login error: $e');
+      print('❌ Stack trace: $stackTrace');
+
+      if (mounted) {
+        authProvider.setError('Login failed: ${e.toString()}');
+      }
     }
   }
 
   void _showForgotPasswordDialog() {
-    final emailController = TextEditingController();
-
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: AppTheme.cardColor,
         title: const Text(
-          'Reset Password',
+          'Forgot Password',
           style: TextStyle(color: Colors.white),
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text(
-              'Enter your email address to receive password reset instructions.',
-              style: TextStyle(color: AppTheme.textSecondary),
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: emailController,
-              style: const TextStyle(color: Colors.white),
-              keyboardType: TextInputType.emailAddress,
-              decoration: InputDecoration(
-                labelText: 'Email',
-                labelStyle: TextStyle(color: AppTheme.textSecondary),
-                border: OutlineInputBorder(
-                  borderSide: BorderSide(color: AppTheme.accentColor),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderSide: BorderSide(color: AppTheme.accentColor),
-                ),
-              ),
-            ),
-          ],
+        content: const Text(
+          'Password reset functionality will be available soon.',
+          style: TextStyle(color: AppTheme.textSecondary),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              // Implement forgot password logic
-              Navigator.of(context).pop();
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content:
-                      Text('Password reset instructions sent to your email!'),
-                  backgroundColor: AppTheme.successGreen,
-                ),
-              );
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.accentColor,
+            child: const Text(
+              'OK',
+              style: TextStyle(color: AppTheme.accentColor),
             ),
-            child: const Text('Send Reset Link'),
           ),
         ],
       ),

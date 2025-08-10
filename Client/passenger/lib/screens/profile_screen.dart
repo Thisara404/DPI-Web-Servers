@@ -66,7 +66,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       body: Consumer<AuthProvider>(
         builder: (context, authProvider, child) {
           if (authProvider.isLoading) {
-            return Center(
+            return const Center(
               child: CircularProgressIndicator(color: AppTheme.accentColor),
             );
           }

@@ -1,8 +1,10 @@
 import 'package:flutter/foundation.dart';
 import '../models/user.dart';
 import '../services/auth_service.dart';
-import '../constants.dart';
 
+/**
+ * Provider for managing authentication state
+ */
 class AuthProvider extends ChangeNotifier {
   User? _user;
   bool _isLoading = false;
