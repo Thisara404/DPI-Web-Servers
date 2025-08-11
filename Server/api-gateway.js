@@ -29,8 +29,13 @@ app.use(cors({
     'http://localhost:3001', 
     'http://localhost:3002',
     'http://localhost:3003',
+    'http://localhost:4001', // Driver API
+    'http://localhost:4002', // Passenger API
     'http://localhost:5173', // Vite default
     'http://localhost:3005', // React default alternative
+    'http://localhost:3006', // Flutter development server
+    'http://192.168.43.187:3000', // Network access
+    'http://192.168.43.187:3006', // Network access for Flutter
     'http://127.0.0.1:5173',
     'http://127.0.0.1:3000'
   ],
@@ -67,7 +72,9 @@ app.get('/health', (req, res) => {
     services: {
       sludi: 'http://localhost:3001',
       ndx: 'http://localhost:3002',
-      paydpi: 'http://localhost:3003'
+      paydpi: 'http://localhost:3003',
+      driver: 'http://localhost:4001',
+      passenger: 'http://localhost:4002'
     },
     version: '1.0.0'
   });
@@ -82,7 +89,8 @@ app.get('/health/all', async (req, res) => {
       sludi: { url: 'http://localhost:3001/health', status: 'unknown' },
       ndx: { url: 'http://localhost:3002/health', status: 'unknown' },
       paydpi: { url: 'http://localhost:3003/health', status: 'unknown' },
-      driver: { url: 'http://localhost:4001/health', status: 'unknown' }
+      driver: { url: 'http://localhost:4001/health', status: 'unknown' },
+      passenger: { url: 'http://localhost:4002/health', status: 'unknown' }
     };
 
     // Check each service
@@ -164,11 +172,52 @@ app.get('/api/docs', (req, res) => {
           'POST /api/subsidies/apply - Apply for subsidy',
           'GET /api/subsidies/active - Get active subsidies'
         ]
+      },
+      driverServices: {
+        name: 'Driver API (Driver Management & Tracking)',
+        baseUrl: '/api/driver',
+        description: 'Driver registration, profile management, and real-time tracking',
+        endpoints: [
+          'POST /api/driver/auth/register - Register new driver',
+          'POST /api/driver/auth/login - Driver login',
+          'GET /api/driver/profile - Get driver profile',
+          'PUT /api/driver/profile - Update driver profile',
+          'GET /api/driver/schedules - Get driver schedules',
+          'POST /api/driver/schedules/accept - Accept schedule assignment',
+          'POST /api/driver/tracking/start - Start location tracking',
+          'POST /api/driver/tracking/update - Update driver location'
+        ]
+      },
+      passengerServices: {
+        name: 'Passenger API (Mobile App Backend)',
+        baseUrl: '/api/passenger',
+        description: 'Passenger registration, bookings, real-time tracking, and mobile app services',
+        endpoints: [
+          'POST /api/passenger/auth/register - Register new passenger',
+          'POST /api/passenger/auth/login - Passenger login',
+          'GET /api/passenger/profile - Get passenger profile',
+          'PUT /api/passenger/profile - Update passenger profile',
+          'POST /api/passenger/auth/verify-citizen - Verify with SLUDI',
+          'GET /api/passenger/dashboard - Get dashboard analytics',
+          'GET /api/passenger/history - Get travel history',
+          'GET /api/passenger/favorites - Get favorite routes',
+          'POST /api/passenger/favorites - Add route to favorites',
+          'POST /api/passenger/tracking/subscribe - Subscribe to real-time tracking',
+          'POST /api/bookings - Create new booking',
+          'GET /api/bookings - Get passenger bookings',
+          'POST /api/bookings/:id/payment - Process booking payment',
+          'GET /api/tickets - Get passenger tickets',
+          'GET /api/tickets/active - Get active tickets',
+          'POST /api/tickets/validate - Validate ticket QR code',
+          'GET /api/map/routes/:routeId - Get route map data',
+          'GET /api/map/buses/live - Get live bus locations',
+          'GET /api/map/stops/nearby - Find nearby bus stops'
+        ]
       }
     },
     usage: {
       authentication: 'All requests except auth endpoints require Authorization: Bearer <token>',
-      rateLimit: '1000 requests per 15 minutes per IP',
+      rateLimit: '100 requests per minute per IP',
       cors: 'Enabled for localhost and common development ports'
     }
   });
@@ -203,7 +252,9 @@ const createProxy = (target, pathRewrite = {}) => {
   });
 };
 
-//// Replace the current routing section with this:
+// ========================================
+// ROUTING CONFIGURATION
+// ========================================
 
 // SLUDI (Authentication) Routes
 app.use('/api/auth', createProxy('http://localhost:3001'));
@@ -228,6 +279,29 @@ app.use('/api/driver/tracking', createProxy('http://localhost:4001', {
 app.use('/api/driver', createProxy('http://localhost:4001', {
   '^/api/driver': '/api/driver'
 }));
+
+// Passenger Authentication Routes (PUBLIC)
+app.use('/api/passenger/auth', createProxy('http://localhost:4002', {
+  '^/api/passenger/auth': '/api/auth'
+}));
+
+// Passenger Profile & Services Routes (PROTECTED)
+app.use('/api/passenger', createProxy('http://localhost:4002', {
+  '^/api/passenger': '/api/passenger'
+}));
+
+// Passenger Bookings Routes (PROTECTED)
+app.use('/api/bookings', createProxy('http://localhost:4002'));
+
+// Passenger Tickets Routes (PROTECTED)
+app.use('/api/tickets', createProxy('http://localhost:4002'));
+
+// Passenger Map Services (PUBLIC/PROTECTED)
+app.use('/api/passenger/auth', createProxy('http://localhost:4002', {
+  '^/api/passenger/auth': '/api/auth'
+}));
+
+app.use('/api/map', createProxy('http://localhost:4002'));
 
 // NDX (National Data Exchange) Routes  
 app.use('/api/routes', createProxy('http://localhost:3002'));
@@ -316,7 +390,7 @@ app.get('/api/services', (req, res) => {
         description: 'Sri Lanka Unified Digital Identity',
         port: 3001,
         status: 'active',
-        routes: ['/api/auth/*', '/api/oauth/*']
+        routes: ['/api/auth/*', '/api/oauth/*', '/api/profile/*']
       },
       {
         name: 'NDX', 
@@ -338,6 +412,13 @@ app.get('/api/services', (req, res) => {
         port: 4001,
         status: 'active',
         routes: ['/api/driver/*']
+      },
+      {
+        name: 'Passenger API',
+        description: 'Passenger Services and Mobile App Backend',
+        port: 4002,
+        status: 'active',
+        routes: ['/api/passenger/*', '/api/bookings/*', '/api/tickets/*', '/api/map/*']
       }
     ]
   });
@@ -388,17 +469,23 @@ app.listen(PORT, () => {
   console.log(`🔗 OAuth Callback: http://localhost:${PORT}/callback`);
   console.log('🌐 =====================================');
   console.log('📡 ROUTING CONFIGURATION:');
-  console.log('   /api/auth/*     → SLUDI (3001)');
-  console.log('   /api/oauth/*    → SLUDI (3001)');
-  console.log('   /api/profile/*  → SLUDI (3001)');
-  console.log('   /api/routes/*   → NDX (3002)');
-  console.log('   /api/journeys/* → NDX (3002)');
-  console.log('   /api/schedules/* → NDX (3002)');
-  console.log('   /api/payments/* → PayDPI (3003)');
-  console.log('   /api/subsidies/* → PayDPI (3003)');
-  console.log('   /api/driver/*   → Driver API (4001) [no rewrite]');
+  console.log('   /api/auth/*          → SLUDI (3001)');
+  console.log('   /api/oauth/*         → SLUDI (3001)');
+  console.log('   /api/profile/*       → SLUDI (3001)');
+  console.log('   /api/routes/*        → NDX (3002)');
+  console.log('   /api/journeys/*      → NDX (3002)');
+  console.log('   /api/schedules/*     → NDX (3002)');
+  console.log('   /api/payments/*      → PayDPI (3003)');
+  console.log('   /api/subsidies/*     → PayDPI (3003)');
+  console.log('   /api/driver/*        → Driver API (4001)');
+  console.log('   /api/passenger/*     → Passenger API (4002)');
+  console.log('   /api/bookings/*      → Passenger API (4002)');
+  console.log('   /api/tickets/*       → Passenger API (4002)');
+  console.log('   /api/map/*           → Passenger API (4002)');
   console.log('🌐 =====================================');
-  console.log('🎯 Ready for frontend connections!');
+  console.log('🎯 Ready for all mobile app connections!');
+  console.log('🚗 Driver App: Flutter → Gateway → Driver API');
+  console.log('🚌 Passenger App: Flutter → Gateway → Passenger API');
   console.log('🌐 =====================================\n');
 });
 

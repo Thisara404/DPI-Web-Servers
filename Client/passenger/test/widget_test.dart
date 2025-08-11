@@ -7,24 +7,56 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:passenger/app.dart';
+import 'package:provider/provider.dart';
 
 import 'package:passenger/main.dart';
+import 'package:passenger/services/storage_service.dart';
+import 'package:passenger/providers/auth_provider.dart';
+import 'package:passenger/providers/schedule_provider.dart';
+import 'package:passenger/providers/journey_provider.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  group('App Widget Tests', () {
+    setUpAll(() async {
+      // Initialize storage service for tests
+      await StorageService.init();
+    });
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    testWidgets('App loads without crashing', (WidgetTester tester) async {
+      // Build our app with proper providers
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider(create: (_) => AuthProvider()),
+            ChangeNotifierProvider(create: (_) => ScheduleProvider()),
+            ChangeNotifierProvider(create: (_) => JourneyProvider()),
+          ],
+          child: const TransitLankaApp(),
+        ),
+      );
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+      // Wait for the app to settle
+      await tester.pumpAndSettle();
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+      // Verify that the app loads successfully
+      expect(find.byType(MaterialApp), findsOneWidget);
+    });
+
+    testWidgets('Basic widget rendering test', (WidgetTester tester) async {
+      // Build a simple test widget
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: Center(
+              child: Text('Transit Lanka Test'),
+            ),
+          ),
+        ),
+      );
+
+      // Verify that the test text is displayed
+      expect(find.text('Transit Lanka Test'), findsOneWidget);
+    });
   });
 }
