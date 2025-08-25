@@ -255,33 +255,33 @@ npm run start:all
 ### 📸 System Demonstration
 
 #### PayDPI Health Check - Payment Infrastructure Running
-![PayDPI Health Check](PayDPI%20health.png)
+![PayDPI Health Check](images/PayDPI%20health.png)
 *PayDPI server successfully running with database connectivity and Stripe configuration*
 
 #### NDX Location Search - Route Discovery
-![NDX Location Search](NDX%20location%20search.png)
+![NDX Location Search](images/NDX%20location%20search.png)
 *NDX service demonstrating location search functionality for "Colombo" with GPS coordinates*
 
 #### SLUDI Authentication - User Management
-![SLUDI Login](SLUDI.png)
+![SLUDI Login](images/SLUDI.png)
 *SLUDI authentication system with successful login and JWT token generation*
 
 #### SLUDI User Profile - Digital Identity
-![SLUDI Profile](SLUDI%20Profile.png)
+![SLUDI Profile](images/SLUDI%20Profile.png)
 *Complete user profile management with Sri Lankan citizen ID integration*
 
 #### Database Collections - Data Persistence
 
 **NDX Database - Journey Management**
-![NDX Database](ndx%20DB.png)
+![NDX Database](images/ndx%20DB.png)
 *Journey bookings with passenger details, route information, and payment status*
 
 **PayDPI Database - Subsidy Management**  
-![PayDPI Database](paydpi%20DB.png)
+![PayDPI Database](images/paydpi%20DB.png)
 *Student subsidy applications with eligibility verification and usage tracking*
 
 **SLUDI Database - Citizen Registry**
-![SLUDI Database](sludi%20DB.png)
+![SLUDI Database](images/sludi%20DB.png)
 *Digital citizen profiles with verification status and role-based access*
 
 ### Health Check All Services
