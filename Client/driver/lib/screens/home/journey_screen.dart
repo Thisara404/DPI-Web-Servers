@@ -6,10 +6,10 @@ import '../../config/theme.dart';
 import '../../providers/schedule_provider.dart';
 import '../../providers/journey_provider.dart';
 import '../../providers/location_provider.dart';
-import 'home_screen.dart';
+import '../../models/schedule_model.dart'; // Add this import
 
 class JourneyScreen extends StatefulWidget {
-  const JourneyScreen({Key? key}) : super(key: key);
+  const JourneyScreen({super.key});
 
   @override
   State<JourneyScreen> createState() => _JourneyScreenState();
@@ -17,7 +17,7 @@ class JourneyScreen extends StatefulWidget {
 
 class _JourneyScreenState extends State<JourneyScreen> {
   GoogleMapController? _mapController;
-  final Completer<GoogleMapController> _controller = Completer();
+  Timer? _locationUpdateTimer;
 
   @override
   void initState() {
@@ -27,22 +27,38 @@ class _JourneyScreenState extends State<JourneyScreen> {
     });
   }
 
+  @override
+  void dispose() {
+    _locationUpdateTimer?.cancel();
+    _mapController?.dispose();
+    super.dispose();
+  }
+
   Future<void> _startLocationTracking() async {
-    final locationProvider = Provider.of<LocationProvider>(context, listen: false);
-    final scheduleProvider = Provider.of<ScheduleProvider>(context, listen: false);
-    
-    final selectedSchedule = scheduleProvider.selectedSchedule;
-    if (selectedSchedule != null && !locationProvider.isTracking) {
-      await locationProvider.startTracking(selectedSchedule.id);
+    try {
+      final locationProvider =
+          Provider.of<LocationProvider>(context, listen: false);
+      final scheduleProvider =
+          Provider.of<ScheduleProvider>(context, listen: false);
+
+      final selectedSchedule = scheduleProvider.selectedSchedule;
+      if (selectedSchedule != null) {
+        await locationProvider.startTracking(
+            selectedSchedule.id, selectedSchedule.journeyId ?? '');
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to start location tracking: ${e.toString()}'),
+            backgroundColor: AppTheme.errorRed,
+          ),
+        );
+      }
     }
   }
 
   Future<void> _endJourney() async {
-    final journeyProvider = Provider.of<JourneyProvider>(context, listen: false);
-    final locationProvider = Provider.of<LocationProvider>(context, listen: false);
-    final scheduleProvider = Provider.of<ScheduleProvider>(context, listen: false);
-
-    // Show confirmation dialog
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -53,9 +69,9 @@ class _JourneyScreenState extends State<JourneyScreen> {
             onPressed: () => Navigator.pop(context, false),
             child: const Text('Cancel'),
           ),
-          ElevatedButton(
+          TextButton(
             onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.errorRed),
+            style: TextButton.styleFrom(foregroundColor: AppTheme.errorRed),
             child: const Text('End Journey'),
           ),
         ],
@@ -63,51 +79,72 @@ class _JourneyScreenState extends State<JourneyScreen> {
     );
 
     if (confirmed == true) {
-      final selectedSchedule = scheduleProvider.selectedSchedule;
-      if (selectedSchedule != null) {
-        await locationProvider.stopTracking(selectedSchedule.id);
-      }
-      
-      final success = await journeyProvider.endJourney();
-      
-      if (success && mounted) {
-        scheduleProvider.clearSelectedSchedule();
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (context) => const HomeScreen()),
-          (route) => false,
-        );
-      } else if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(journeyProvider.error ?? 'Failed to end journey'),
-            backgroundColor: AppTheme.errorRed,
+      // Show loading dialog
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const AlertDialog(
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 16),
+              Text('Ending journey...'),
+            ],
           ),
-        );
+        ),
+      );
+
+      try {
+        final journeyProvider =
+            Provider.of<JourneyProvider>(context, listen: false);
+        final locationProvider =
+            Provider.of<LocationProvider>(context, listen: false);
+        final scheduleProvider =
+            Provider.of<ScheduleProvider>(context, listen: false);
+
+        final selectedSchedule = scheduleProvider.selectedSchedule;
+        if (selectedSchedule != null) {
+          await locationProvider.stopTracking(selectedSchedule.id);
+        }
+
+        final success = await journeyProvider.endJourney();
+
+        // Close loading dialog
+        if (mounted) Navigator.pop(context);
+
+        if (success && mounted) {
+          scheduleProvider.clearSelectedSchedule();
+          Navigator.pop(context);
+        } else if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(journeyProvider.error ?? 'Failed to end journey'),
+              backgroundColor: AppTheme.errorRed,
+            ),
+          );
+        }
+      } catch (e) {
+        // Close loading dialog
+        if (mounted) Navigator.pop(context);
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error ending journey: ${e.toString()}'),
+              backgroundColor: AppTheme.errorRed,
+            ),
+          );
+        }
       }
     }
-  }
-
-  void _onMapCreated(GoogleMapController controller) {
-    _controller.complete(controller);
-    _mapController = controller;
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Journey Tracking'),
-        leading: IconButton(
-          icon: const Icon(Icons.home),
-          onPressed: () {
-            Navigator.pushAndRemoveUntil(
-              context,
-              MaterialPageRoute(builder: (context) => const HomeScreen()),
-              (route) => false,
-            );
-          },
-        ),
+        title: const Text('Live Journey'),
         actions: [
           IconButton(
             icon: const Icon(Icons.stop, color: AppTheme.errorRed),
@@ -116,7 +153,8 @@ class _JourneyScreenState extends State<JourneyScreen> {
         ],
       ),
       body: Consumer3<ScheduleProvider, JourneyProvider, LocationProvider>(
-        builder: (context, scheduleProvider, journeyProvider, locationProvider, child) {
+        builder: (context, scheduleProvider, journeyProvider, locationProvider,
+            child) {
           final selectedSchedule = scheduleProvider.selectedSchedule;
           final currentPosition = locationProvider.currentPosition;
 
@@ -132,19 +170,23 @@ class _JourneyScreenState extends State<JourneyScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        selectedSchedule.routeName,
-                        style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
+                        'Route ${selectedSchedule.routeId}',
+                        style: Theme.of(context)
+                            .textTheme
+                            .headlineMedium
+                            ?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
                       ),
                       const SizedBox(height: 8),
                       Row(
                         children: [
-                          const Icon(Icons.location_on, color: AppTheme.successGreen, size: 16),
+                          Icon(Icons.location_on,
+                              color: AppTheme.successGreen, size: 16),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
-                              '${selectedSchedule.startLocation} → ${selectedSchedule.endLocation}',
+                              '${_getStartLocation(selectedSchedule)} → ${_getEndLocation(selectedSchedule)}',
                               style: Theme.of(context).textTheme.bodyMedium,
                             ),
                           ),
@@ -157,28 +199,33 @@ class _JourneyScreenState extends State<JourneyScreen> {
                           Row(
                             children: [
                               Icon(
-                                locationProvider.isTracking ? Icons.gps_fixed : Icons.gps_off,
-                                color: locationProvider.isTracking ? AppTheme.successGreen : AppTheme.errorRed,
+                                locationProvider.isTracking
+                                    ? Icons.gps_fixed
+                                    : Icons.gps_off,
+                                color: locationProvider.isTracking
+                                    ? AppTheme.successGreen
+                                    : AppTheme.errorRed,
                                 size: 16,
                               ),
                               const SizedBox(width: 8),
                               Text(
-                                locationProvider.isTracking ? 'Live Tracking' : 'Tracking Disabled',
+                                locationProvider.isTracking
+                                    ? 'Live Tracking Active'
+                                    : 'Tracking Disabled',
                                 style: TextStyle(
-                                  color: locationProvider.isTracking ? AppTheme.successGreen : AppTheme.errorRed,
+                                  color: locationProvider.isTracking
+                                      ? AppTheme.successGreen
+                                      : AppTheme.errorRed,
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
                             ],
                           ),
-                          if (selectedSchedule.busNumber != null) ...[
+                          if (currentPosition != null)
                             Text(
-                              'Bus: ${selectedSchedule.busNumber}',
-                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                fontWeight: FontWeight.bold,
-                              ),
+                              '${currentPosition.latitude.toStringAsFixed(4)}, ${currentPosition.longitude.toStringAsFixed(4)}',
+                              style: Theme.of(context).textTheme.bodySmall,
                             ),
-                          ],
                         ],
                       ),
                     ],
@@ -190,7 +237,9 @@ class _JourneyScreenState extends State<JourneyScreen> {
               Expanded(
                 child: currentPosition != null
                     ? GoogleMap(
-                        onMapCreated: _onMapCreated,
+                        onMapCreated: (controller) {
+                          _mapController = controller;
+                        },
                         initialCameraPosition: CameraPosition(
                           target: LatLng(
                             currentPosition.latitude,
@@ -205,8 +254,10 @@ class _JourneyScreenState extends State<JourneyScreen> {
                               currentPosition.latitude,
                               currentPosition.longitude,
                             ),
-                            infoWindow: const InfoWindow(title: 'Your Location'),
-                            icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+                            infoWindow:
+                                const InfoWindow(title: 'Your Location'),
+                            icon: BitmapDescriptor.defaultMarkerWithHue(
+                                BitmapDescriptor.hueGreen),
                           ),
                         },
                         myLocationEnabled: true,
@@ -249,7 +300,8 @@ class _JourneyScreenState extends State<JourneyScreen> {
                             Expanded(
                               child: Text(
                                 locationProvider.error!,
-                                style: const TextStyle(color: AppTheme.errorRed),
+                                style:
+                                    const TextStyle(color: AppTheme.errorRed),
                               ),
                             ),
                             TextButton(
@@ -268,7 +320,9 @@ class _JourneyScreenState extends State<JourneyScreen> {
                                 ? null
                                 : () {
                                     if (selectedSchedule != null) {
-                                      locationProvider.startTracking(selectedSchedule.id);
+                                      locationProvider.startTracking(
+                                          selectedSchedule.id,
+                                          selectedSchedule.journeyId ?? '');
                                     }
                                   },
                             icon: const Icon(Icons.play_arrow),
@@ -295,15 +349,31 @@ class _JourneyScreenState extends State<JourneyScreen> {
                     ),
                     if (currentPosition != null) ...[
                       const SizedBox(height: 12),
-                      Text(
-                        'Current Location: ${currentPosition.latitude.toStringAsFixed(6)}, ${currentPosition.longitude.toStringAsFixed(6)}',
-                        style: Theme.of(context).textTheme.bodySmall,
-                        textAlign: TextAlign.center,
-                      ),
-                      Text(
-                        'Speed: ${currentPosition.speed.toStringAsFixed(1)} m/s | Accuracy: ${currentPosition.accuracy.toStringAsFixed(1)}m',
-                        style: Theme.of(context).textTheme.bodySmall,
-                        textAlign: TextAlign.center,
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.speed,
+                            color: Colors.grey[600],
+                            size: 16,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Speed: ${currentPosition.speed.toStringAsFixed(1)} m/s',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                          const SizedBox(width: 16),
+                          Icon(
+                            Icons.gps_fixed,
+                            color: Colors.grey[600],
+                            size: 16,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Accuracy: ${currentPosition.accuracy.toStringAsFixed(1)}m',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        ],
                       ),
                     ],
                   ],
@@ -316,9 +386,16 @@ class _JourneyScreenState extends State<JourneyScreen> {
     );
   }
 
-  @override
-  void dispose() {
-    _mapController?.dispose();
-    super.dispose();
+  // Helper methods to safely get location data
+  String _getStartLocation(Schedule schedule) {
+    return schedule.routeDetails?['from']?.toString() ??
+        schedule.startLocation ??
+        'Start Location';
+  }
+
+  String _getEndLocation(Schedule schedule) {
+    return schedule.routeDetails?['to']?.toString() ??
+        schedule.endLocation ??
+        'End Location';
   }
 }
