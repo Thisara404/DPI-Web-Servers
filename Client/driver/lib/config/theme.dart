@@ -1,79 +1,95 @@
 import 'package:flutter/material.dart';
 
 class AppTheme {
-  // Color palette
-  static const Color primaryDark = Color(0xFF14171e);
-  static const Color secondaryDark = Color(0xFF181b22);
-  static const Color tertiaryDark = Color(0xFF0b0e13);
-  static const Color surfaceDark = Color(0xFF181d23);
-  static const Color backgroundDark = Color(0xFF101318);
-  
-  static const Color errorRed = Color(0xFFd03437);
-  static const Color successGreen = Color(0xFF2ba471);
-  static const Color warningYellow = Color(0xFFe6a935);
-  
+  // Colors
+  static const Color primaryColor = Color(0xFF1976D2);
+  static const Color secondaryColor = Color(0xFF424242);
+  static const Color accentColor = Color(0xFF00BCD4);
+  static const Color successGreen = Color(0xFF4CAF50);
+  static const Color errorRed = Color(0xFFF44336);
+  static const Color warningYellow = Color(0xFFFFC107);
+  static const Color surfaceDark = Color(0xFF303030);
+  static const Color cardColor = Color(0xFF424242);
   static const Color textPrimary = Colors.white;
   static const Color textSecondary = Color(0xFFB0B0B0);
+  static const Color backgroundColor = Color(0xFF121212);
+  static const Color routeColor = Color(0xFF9C27B0);
 
+  // Text Styles
+  static const TextStyle headlineLarge = TextStyle(
+    fontSize: 32,
+    fontWeight: FontWeight.bold,
+    color: textPrimary,
+  );
+
+  static const TextStyle headlineMedium = TextStyle(
+    fontSize: 24,
+    fontWeight: FontWeight.bold,
+    color: textPrimary,
+  );
+
+  static const TextStyle bodyLarge = TextStyle(
+    fontSize: 16,
+    color: textPrimary,
+  );
+
+  static const TextStyle bodyMedium = TextStyle(
+    fontSize: 14,
+    color: textPrimary,
+  );
+
+  static const TextStyle bodySmall = TextStyle(
+    fontSize: 12,
+    color: textSecondary,
+  );
+
+  // Dark Theme
   static ThemeData darkTheme = ThemeData(
+    useMaterial3: true,
     brightness: Brightness.dark,
-    primaryColor: primaryDark,
-    scaffoldBackgroundColor: primaryDark,
-    
-    colorScheme: const ColorScheme.dark(
-      primary: successGreen,
-      secondary: warningYellow,
-      error: errorRed,
-      surface: surfaceDark,
-      background: backgroundDark,
-    ),
-
+    primaryColor: primaryColor,
+    scaffoldBackgroundColor: backgroundColor,
+    cardColor: cardColor,
     appBarTheme: const AppBarTheme(
-      backgroundColor: secondaryDark,
+      backgroundColor: primaryColor,
+      foregroundColor: textPrimary,
       elevation: 0,
-      titleTextStyle: TextStyle(
-        color: textPrimary,
-        fontSize: 20,
-        fontWeight: FontWeight.bold,
-      ),
-      iconTheme: IconThemeData(color: textPrimary),
     ),
-
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
-        backgroundColor: successGreen,
-        foregroundColor: Colors.white,
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+        backgroundColor: primaryColor,
+        foregroundColor: textPrimary,
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(8),
         ),
       ),
     ),
-
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
-      fillColor: surfaceDark,
+      fillColor: cardColor,
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
         borderSide: BorderSide.none,
       ),
-      hintStyle: const TextStyle(color: textSecondary),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: primaryColor),
+      ),
       labelStyle: const TextStyle(color: textSecondary),
+      hintStyle: const TextStyle(color: textSecondary),
     ),
-
     cardTheme: CardTheme(
-      color: surfaceDark,
+      color: cardColor,
       elevation: 4,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
       ),
     ),
-
-    textTheme: const TextTheme(
-      headlineLarge: TextStyle(color: textPrimary, fontWeight: FontWeight.bold),
-      headlineMedium: TextStyle(color: textPrimary, fontWeight: FontWeight.bold),
-      bodyLarge: TextStyle(color: textPrimary),
-      bodyMedium: TextStyle(color: textSecondary),
+    bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+      backgroundColor: cardColor,
+      selectedItemColor: primaryColor,
+      unselectedItemColor: textSecondary,
     ),
   );
 }

@@ -1,24 +1,28 @@
 name: bus_driver_app
 description: A Flutter app for bus drivers with schedule management and live tracking.
 
-publish_to: 'none'
+publish_to: "none"
 version: 1.0.0+1
 
 environment:
-  sdk: '>=3.0.0 <4.0.0'
+  sdk: ">=3.0.0 <4.0.0"
 
 dependencies:
   flutter:
     sdk: flutter
+  flutter_map: ^7.0.2  # For open-source map (uses OpenStreetMap)
+  latlong2: ^0.9.1    # Required for flutter_map coordinates
   cupertino_icons: ^1.0.2
-  http: ^1.1.0
+  http: ^1.2.2
   shared_preferences: ^2.2.2
   google_maps_flutter: ^2.5.0
   location: ^5.0.3
-  geolocator: ^10.1.0
-  provider: ^6.1.1
+  geolocator: ^12.0.0
+  provider: ^6.1.2
   flutter_polyline_points: ^2.0.0
   permission_handler: ^11.2.0
+  flutter_secure_storage: ^9.0.0 # For secure token storage
+  web_socket_channel: ^3.0.1 # For real-time tracking (if needed)
 
 dev_dependencies:
   flutter_test:
@@ -27,3 +31,5 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/images/

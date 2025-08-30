@@ -1,22 +1,24 @@
+// lib/main.dart (updated)
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'config/theme.dart';
 import 'providers/auth_provider.dart';
 import 'providers/schedule_provider.dart';
-import 'providers/journey_provider.dart';
-import 'providers/location_provider.dart';
-import 'Screens/auth/login_screen.dart';
-import 'Screens/home/home_screen.dart';
-import 'utils/shared_prefs.dart';
+import 'providers/tracking_provider.dart';
+import 'providers/journey_provider.dart'; // Add this
+import 'providers/location_provider.dart'; // Add this
+import 'screens/auth/login_screen.dart';
+import 'screens/auth/register_screen.dart';
+import 'screens/home/home_screen.dart';
+import 'screens/splash_screen.dart';
 
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  await SharedPrefs.init();
+void main() {
   runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({Key? key}) : super(key: key);
+  const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -24,30 +26,37 @@ class MyApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => ScheduleProvider()),
-        ChangeNotifierProvider(create: (_) => JourneyProvider()),
-        ChangeNotifierProvider(create: (_) => LocationProvider()),
+        ChangeNotifierProvider(create: (_) => TrackingProvider()),
+        ChangeNotifierProvider(create: (_) => JourneyProvider()), // Add this
+        ChangeNotifierProvider(create: (_) => LocationProvider()), // Add this
       ],
       child: MaterialApp(
         title: 'Bus Driver App',
-        theme: AppTheme.darkTheme,
-        home: FutureBuilder<bool>(
-          future: _checkAuthStatus(),
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Scaffold(
-                body: Center(child: CircularProgressIndicator()),
-              );
-            }
-            return snapshot.data == true ? const HomeScreen() : const LoginScreen();
-          },
+        theme: ThemeData(
+          primarySwatch: Colors.blue,
+          useMaterial3: true,
+          appBarTheme: const AppBarTheme(
+            centerTitle: true,
+            elevation: 0,
+          ),
+          elevatedButtonTheme: ElevatedButtonThemeData(
+            style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+          ),
         ),
+        initialRoute: '/splash',
+        routes: {
+          '/splash': (context) => const SplashScreen(),
+          '/login': (context) => const LoginScreen(),
+          '/register': (context) => const RegisterScreen(),
+          '/home': (context) => const HomeScreen(),
+        },
         debugShowCheckedModeBanner: false,
       ),
     );
-  }
-
-  Future<bool> _checkAuthStatus() async {
-    final token = SharedPrefs.getToken();
-    return token != null && token.isNotEmpty;
   }
 }

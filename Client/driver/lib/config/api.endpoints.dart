@@ -1,35 +1,50 @@
+// lib/config/api_endpoint.dart
+
 class ApiEndpoints {
-  // Base URLs - Update to use API Gateway
+  // Base URL - Switch between dev and prod
   static const String baseUrl =
-      'http://192.168.43.187:3000'; // API Gateway port
-  static const String apiUrl = '$baseUrl/api';
+      'http://192.168.43.187:3000'; // Gateway URL for local dev
+  // static const String baseUrl = 'https://your-production-gateway.com';  // Uncomment for prod
 
-  // Driver Auth Endpoints (these will be proxied to Driver API on port 4001)
-  static const String driverRegister = '$apiUrl/driver/auth/register';
-  static const String driverLogin = '$apiUrl/driver/auth/login';
-  static const String driverLogout = '$apiUrl/driver/auth/logout';
-  static const String driverProfile = '$apiUrl/driver/profile';
-  static const String driverValidateToken =
-      '$apiUrl/driver/auth/validate-token';
+  // Authentication Endpoints
+  static const String register = '$baseUrl/api/driver/auth/register';
+  static const String login = '$baseUrl/api/driver/auth/login';
+  static const String logout = '$baseUrl/api/driver/auth/logout';
+  static const String refreshToken = '$baseUrl/api/driver/auth/refresh';
+  static const String profile =
+      '$baseUrl/api/driver/profile'; // GET for view, PUT for update
 
-  // Schedule endpoints (proxied to NDX)
-  static const String schedules = '$apiUrl/schedules';
-  static const String activeSchedules = '$apiUrl/schedules/active';
+  // Driver Management Endpoints
+  static const String driverStatus =
+      '$baseUrl/api/driver/status'; // PATCH for online/offline
+  static const String verifyDocuments =
+      '$baseUrl/api/driver/verify-documents'; // POST for document upload
 
-  // Journey endpoints (proxied to NDX)
-  static const String journeys = '$apiUrl/journeys';
-  static const String startJourney = '$apiUrl/journeys/start';
+  // Schedule Management Endpoints
+  static const String schedules =
+      '$baseUrl/api/driver/schedules'; // GET all schedules
+  static const String activeSchedules =
+      '$baseUrl/api/driver/schedules/active'; // GET active
+  static const String acceptSchedule =
+      '$baseUrl/api/driver/schedules/accept'; // POST
+  static const String startJourney =
+      '$baseUrl/api/driver/schedules/start'; // POST
 
-  // Tracking endpoints (proxied to Driver API)
-  static const String trackingStart = '$apiUrl/driver/tracking/start';
-  static const String trackingUpdate = '$apiUrl/driver/tracking/update';
-  static const String trackingStop = '$apiUrl/driver/tracking/stop';
+  // Location Tracking Endpoints
+  static const String startTracking =
+      '$baseUrl/api/driver/tracking/start'; // POST
+  static const String updateTracking =
+      '$baseUrl/api/driver/tracking/update'; // POST
+  static const String stopTracking =
+      '$baseUrl/api/driver/tracking/stop'; // POST
+  static const String trackingHistory =
+      '$baseUrl/api/driver/tracking/history'; // GET
 
-  // Helper methods
-  static String scheduleById(String id) => '$schedules/$id';
-  static String journeyById(String id) => '$journeys/$id';
-  static String updateDriverLocation(String scheduleId) =>
-      '$apiUrl/schedules/$scheduleId/location';
-  static String driverLocation(String scheduleId) =>
-      '$apiUrl/schedules/$scheduleId/location';
+  // Analytics Endpoints
+  static const String driverStatistics =
+      '$baseUrl/api/driver/statistics'; // GET
+
+  // Health and Docs (Optional, for debugging)
+  static const String health = '$baseUrl/health';
+  static const String apiDocs = '$baseUrl/api/docs';
 }

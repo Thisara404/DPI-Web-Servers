@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import '../config/api.endpoints.dart';
 import '../models/journey.dart';
 import '../services/api_service.dart';
@@ -8,6 +9,7 @@ class JourneyProvider extends ChangeNotifier {
   Journey? _currentJourney;
   bool _isLoading = false;
   String? _error;
+  final ApiService _apiService = ApiService(); // Create instance
 
   Journey? get currentJourney => _currentJourney;
   bool get isLoading => _isLoading;
@@ -21,33 +23,26 @@ class JourneyProvider extends ChangeNotifier {
     _error = null;
 
     try {
-      final response = await ApiService.post(
+      // Use the instance method and parse the response directly into a Journey object
+      final response = await _apiService.post<Journey>(
         ApiEndpoints.startJourney,
         {'scheduleId': scheduleId},
+        // FIX: Handle potentially nested JSON from the API response.
+        // This now correctly handles responses like { "data": { "journey": {...} } } or { "data": {...} }
+        fromJsonT: (json) => Journey.fromJson(json['journey'] ?? json),
       );
 
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-
-        // Create a journey object from the response
-        _currentJourney = Journey(
-          id: data['data']['journeyId'] ?? scheduleId,
-          scheduleId: scheduleId,
-          driverId: data['data']['driverId'] ?? '',
-          status: 'started',
-          startTime: DateTime.now(),
-        );
-
+      if (response.success && response.data != null) {
+        _currentJourney = response.data;
         _setLoading(false);
         return true;
       } else {
-        final errorData = json.decode(response.body);
-        _error = errorData['message'] ?? 'Failed to start journey';
+        _error = response.message ?? 'Failed to start journey';
         _setLoading(false);
         return false;
       }
     } catch (e) {
-      _error = 'Network error: ${e.toString()}';
+      _error = e.toString().replaceFirst('Exception: ', '');
       _setLoading(false);
       return false;
     }
@@ -60,24 +55,24 @@ class JourneyProvider extends ChangeNotifier {
     _error = null;
 
     try {
-      // Use tracking stop endpoint to end journey
-      final response = await ApiService.post(
-        ApiEndpoints.trackingStop,
+      // Use a generic type since we only care about the success status
+      final response = await _apiService.post<Map<String, dynamic>>(
+        ApiEndpoints.stopTracking,
         {'scheduleId': _currentJourney!.scheduleId},
+        fromJsonT: (json) => json,
       );
 
-      if (response.statusCode == 200) {
+      if (response.success) {
         _currentJourney = null;
         _setLoading(false);
         return true;
       } else {
-        final errorData = json.decode(response.body);
-        _error = errorData['message'] ?? 'Failed to end journey';
+        _error = response.message ?? 'Failed to end journey';
         _setLoading(false);
         return false;
       }
     } catch (e) {
-      _error = 'Network error: ${e.toString()}';
+      _error = e.toString().replaceFirst('Exception: ', '');
       _setLoading(false);
       return false;
     }
