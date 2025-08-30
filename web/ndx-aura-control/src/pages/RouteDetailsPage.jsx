@@ -1,21 +1,41 @@
 import React, { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { getRouteDetails } from "@/api/ndxApi";
 import RouteMap from "@/components/RouteMap";
 
 export default function RouteDetailsPage() {
   const { routeId } = useParams();
+  const navigate = useNavigate();
   const [route, setRoute] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    if (!routeId) return;
+    // Guard: don't call API with missing/invalid routeId
+    if (!routeId) {
+      console.warn("RouteDetailsPage: missing routeId in URL");
+      setError("No route ID provided in URL");
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
+    setError(null);
+
     getRouteDetails(routeId)
       .then((res) => setRoute(res.data?.data || res.data))
-      .catch((err) => console.error("Failed to load route details:", err))
+      .catch((err) => {
+        console.error("Failed to load route details:", err);
+        setError(
+          err.response?.data?.message ||
+            err.message ||
+            "Failed to load route"
+        );
+        // optional: if id appears invalid, navigate back to list
+        // navigate('/routes');
+      })
       .finally(() => setLoading(false));
-  }, [routeId]);
+  }, [routeId, navigate]);
 
   if (loading)
     return (
@@ -23,8 +43,10 @@ export default function RouteDetailsPage() {
         Loading route...
       </div>
     );
+  if (error)
+    return <div className="p-6 text-red-500">Error: {error}</div>;
   if (!route)
-    return <div className="text-red-500">Route not found</div>;
+    return <div className="p-6 text-red-500">Route not found</div>;
 
   return (
     <div className="p-6">

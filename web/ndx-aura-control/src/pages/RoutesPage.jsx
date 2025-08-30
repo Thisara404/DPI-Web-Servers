@@ -47,8 +47,13 @@ export default function RoutesPage() {
     console.log('Find routes results:', results);
   };
 
-  const handleRouteClick = (routeId) => {
-    navigate(`/routes/${routeId}`);
+  // Simplified: accept an id (string/number). Avoid trying to extract id from undefined route objects.
+  const handleRouteClick = (id) => {
+    if (!id) {
+      console.warn('handleRouteClick: missing route id', id);
+      return;
+    }
+    navigate(`/routes/${id}`);
   };
 
   if (loading) {
@@ -111,29 +116,40 @@ export default function RoutesPage() {
                 </tr>
               </thead>
               <tbody>
-                {routes?.map((route, index) => (
-                  <tr
-                    key={route.routeId || index}
-                    className="border-b border-white/5 hover:bg-white/5 transition-colors cursor-pointer"
-                    onClick={() => handleRouteClick(route.routeId)}
-                  >
-                    <td className="py-4 text-ndx-light">{route.name}</td>
-                    <td className="py-4 text-ndx-light/70">{route.routeId}</td>
-                    <td className="py-4 text-ndx-light/70">{route.distance}</td>
-                    <td className="py-4 text-ndx-light/70">{route.stopsCount}</td>
-                    <td className="py-4">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleRouteClick(route.routeId);
-                        }}
-                        className="px-4 py-2 bg-ndx-primary/20 text-ndx-primary rounded-lg hover:bg-ndx-primary hover:text-white transition-all duration-300"
-                      >
-                        View Details
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                {routes?.map((route, index) => {
+                  // Resolve a stable id from possible fields, fallback to index string to avoid undefined
+                  const resolvedId =
+                    route?.routeId ||
+                    route?._id ||
+                    route?.id ||
+                    route?.route_id ||
+                    (typeof route === 'string' || typeof route === 'number' ? route : null) ||
+                    `idx-${index}`;
+
+                  return (
+                    <tr
+                      key={resolvedId}
+                      className="border-b border-white/5 hover:bg-white/5 transition-colors cursor-pointer"
+                      onClick={() => handleRouteClick(resolvedId)}
+                    >
+                      <td className="py-4 text-ndx-light">{route?.name || '—'}</td>
+                      <td className="py-4 text-ndx-light/70">{route?.routeId || route?._id || route?.id || '—'}</td>
+                      <td className="py-4 text-ndx-light/70">{route?.distance ?? '—'}</td>
+                      <td className="py-4 text-ndx-light/70">{route?.stopsCount ?? route?.stops?.length ?? 0}</td>
+                      <td className="py-4">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRouteClick(resolvedId);
+                          }}
+                          className="px-4 py-2 bg-ndx-primary/20 text-ndx-primary rounded-lg hover:bg-ndx-primary hover:text-white transition-all duration-300"
+                        >
+                          View Details
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
