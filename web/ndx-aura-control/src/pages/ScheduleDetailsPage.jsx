@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import ndxApi from "@/api/ndxApi";
+import { getSchedules } from "@/api/ndxApi"; // Assuming getSchedules can fetch by ID; adjust if needed
+import UpdateLocationForm from "@/components/forms/UpdateLocationForm";
+import ChangeStatusForm from "@/components/forms/ChangeStatusForm";
 
 export default function ScheduleDetailsPage() {
   const { id } = useParams();
@@ -10,29 +12,44 @@ export default function ScheduleDetailsPage() {
   useEffect(() => {
     if (!id) return;
     setLoading(true);
-    ndxApi.get(`/schedules/${id}`)
-      .then(r => setSchedule(r.data?.data || r.data))
-      .catch(e => console.error(e))
+    getSchedules({ id }) // Adjust to GET /api/schedules/:id if available
+      .then((res) => setSchedule(res.data?.data || res.data))
+      .catch((err) => console.error("Failed to load schedule:", err))
       .finally(() => setLoading(false));
   }, [id]);
 
-  async function updateLocation() {
-    // quick example: update location to random coords (replace with real UI)
-    try {
-      await ndxApi.post(`/schedules/${id}/location`, { lat: 6.9, lng: 79.8 });
-      alert("Location updated");
-    } catch (err) { console.error(err); alert("Failed"); }
-  }
-
-  if (loading) return <div>Loading...</div>;
-  if (!schedule) return <div>Schedule not found</div>;
+  if (loading)
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        Loading schedule...
+      </div>
+    );
+  if (!schedule)
+    return <div className="text-red-500">Schedule not found</div>;
 
   return (
     <div className="p-6">
-      <h1 className="text-xl font-bold">Schedule {schedule._id || schedule.id}</h1>
-      <p>Route: {schedule.routeName}</p>
-      <p>Status: {schedule.status}</p>
-      <button onClick={updateLocation} className="btn mt-4">Update Location (demo)</button>
+      <h1 className="text-2xl font-bold">
+        Schedule {schedule._id || schedule.id}
+      </h1>
+      <p className="text-sm text-muted">Route: {schedule.routeName}</p>
+      <p className="text-sm text-muted">
+        Start Time: {schedule.startTime}
+      </p>
+      <p className="text-sm text-muted">End Time: {schedule.endTime}</p>
+      <p className="text-sm text-muted">Status: {schedule.status}</p>
+      <p className="text-sm text-muted">
+        Current Location: {schedule.currentLocation?.lat},{" "}
+        {schedule.currentLocation?.lng}
+      </p>
+
+      <div className="mt-6 space-y-4">
+        <UpdateLocationForm scheduleId={id} />
+        <ChangeStatusForm
+          scheduleId={id}
+          initialStatus={schedule.status}
+        />
+      </div>
     </div>
   );
 }

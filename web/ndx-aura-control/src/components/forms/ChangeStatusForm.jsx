@@ -1,12 +1,7 @@
 import React, { useState } from "react";
-import ndxApi from "@/api/ndxApi";
+import { changeScheduleStatus } from "@/api/ndxApi";
 
-const STATUSES = [
-  { value: "upcoming", label: "Upcoming" },
-  { value: "in_progress", label: "In Progress" },
-  { value: "completed", label: "Completed" },
-  { value: "cancelled", label: "Cancelled" },
-];
+const STATUSES = ["upcoming", "in_progress", "completed", "cancelled"];
 
 export default function ChangeStatusForm({ scheduleId, initialStatus, onChanged } = {}) {
   const [status, setStatus] = useState(initialStatus || "in_progress");
@@ -18,23 +13,30 @@ export default function ChangeStatusForm({ scheduleId, initialStatus, onChanged 
     e.preventDefault();
     setLoading(true);
     try {
-      await ndxApi.patch(`/schedules/${scheduleId}/status`, { status });
+      await changeScheduleStatus(scheduleId, { status });
       onChanged?.(status);
-      alert("Status updated.");
+      alert("Status updated");
     } catch (err) {
       console.error(err);
-      alert("Failed to update status.");
+      alert("Failed to update status");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="flex items-center gap-2">
+    <form onSubmit={handleSubmit} className="space-y-2">
+      <h3 className="font-semibold">Change Status</h3>
       <select value={status} onChange={(e) => setStatus(e.target.value)} className="input">
-        {STATUSES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+        {STATUSES.map((s) => (
+          <option key={s} value={s}>
+            {s}
+          </option>
+        ))}
       </select>
       <button type="submit" className="btn" disabled={loading}>
         {loading ? "Updating..." : "Change Status"}
       </button>
     </form>
+  );
+}

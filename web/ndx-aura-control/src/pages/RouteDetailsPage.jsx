@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import ndxApi from "@/api/ndxApi";
+import { getRouteDetails } from "@/api/ndxApi";
+import RouteMap from "@/components/RouteMap";
 
 export default function RouteDetailsPage() {
   const { routeId } = useParams();
@@ -10,33 +11,45 @@ export default function RouteDetailsPage() {
   useEffect(() => {
     if (!routeId) return;
     setLoading(true);
-    ndxApi.get(`/routes/${routeId}/details`)
-      .then((r) => setRoute(r.data || r.data?.data))
-      .catch((e) => console.error(e))
+    getRouteDetails(routeId)
+      .then((res) => setRoute(res.data?.data || res.data))
+      .catch((err) => console.error("Failed to load route details:", err))
       .finally(() => setLoading(false));
   }, [routeId]);
 
-  if (loading) return <div>Loading route...</div>;
-  if (!route) return <div>Route not found</div>;
+  if (loading)
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        Loading route...
+      </div>
+    );
+  if (!route)
+    return <div className="text-red-500">Route not found</div>;
 
   return (
     <div className="p-6">
-      <h1 className="text-2xl font-bold">{route.name || route.routeName}</h1>
-      <p className="text-sm text-muted">Distance: {route.distance}</p>
-      <div className="mt-4">
-        <h2 className="font-semibold">Stops</h2>
-        <ul>
-          {(route.stops || []).map((s) => (
-            <li key={s._id || s.id}>{s.name} — {s.lat},{s.lng}</li>
+      <h1 className="text-2xl font-bold">{route.name}</h1>
+      <p className="text-sm text-muted">Distance: {route.distance} km</p>
+      <p className="text-sm text-muted">
+        Description: {route.description || "N/A"}
+      </p>
+
+      <div className="mt-6">
+        <h2 className="text-xl font-semibold">Stops</h2>
+        <ul className="list-disc pl-5">
+          {(route.stops || []).map((stop, i) => (
+            <li key={i}>
+              {stop.name} - Lat: {stop.lat}, Lng: {stop.lng}
+            </li>
           ))}
         </ul>
       </div>
+
       <div className="mt-6">
-        <h2 className="font-semibold">Map</h2>
-        {/* reuse RouteMap component */}
+        <h2 className="text-xl font-semibold">Map</h2>
         <div style={{ height: 400 }}>
-          {/* RouteMap expects geometry/stops — adjust props if needed */}
-          <iframe title="map" srcDoc={`<div>Map placeholder (implement RouteMap)</div>`} style={{width:'100%',height:'100%',border:0}} />
+          <RouteMap route={route} />{" "}
+          {/* Pass route data to RouteMap for rendering polyline/stops */}
         </div>
       </div>
     </div>

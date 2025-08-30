@@ -71,3 +71,34 @@ Yes, you can!
 To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
 
 Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+
+# NDX Dashboard
+
+## Overview
+A React dashboard for managing NDX server operations, including routes, schedules, journeys, and maps.
+
+## Setup
+1. Install dependencies: `npm install`
+2. Set environment: Create `.env` with `REACT_APP_NDX_URL=http://localhost:3002`
+3. Start NDX server: `node server.js` in `Server/NDX`
+4. Run dashboard: `npm run dev`
+
+## Features
+- Authentication via NDX debug token
+- CRUD for routes, schedules, journeys
+- Map integration with RouteMap
+- Analytics dashboard
+- Real-time updates
+
+## API Integration
+- Base URL: `http://localhost:3002` (or gateway `http://localhost:3000`)
+- Endpoints: See `src/api/ndxApi.js`
+- Auth: JWT in localStorage
+
+## Testing
+- End-to-end: Test auth → routes → schedules → journeys
+- Handle errors: 401 clears token, 404/500 show toasts
+
+## Deployment
+- Build: `npm run build`
+- Serve: Use static server, ensure CORS on NDX server

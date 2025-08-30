@@ -1,15 +1,51 @@
+import React, { useEffect, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { getRoutes, getNearbyStops } from '@/api/ndxApi';
+import SearchLocationsForm from '@/components/forms/SearchLocationsForm';
+import FindRoutesForm from '@/components/forms/FindRoutesForm';
 
-import { useState } from 'react';
-import { useFetch } from '../hooks/useFetch';
-import { getRoutes } from '../api/ndxApi';
-import { useNavigate } from 'react-router-dom';
-import SearchLocationsForm from '../components/forms/SearchLocationsForm';
-import FindRoutesForm from '../components/forms/FindRoutesForm';
-
-const RoutesPage = () => {
+export default function RoutesPage() {
   const navigate = useNavigate();
-  const { data: routes, loading, error, refetch } = useFetch(getRoutes);
+  const [routes, setRoutes] = useState([]);
+  const [nearbyStops, setNearbyStops] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('list');
+  const [searchQuery, setSearchQuery] = useState('');
+
+  useEffect(() => {
+    loadRoutes();
+  }, []);
+
+  const loadRoutes = async () => {
+    setLoading(true);
+    try {
+      const res = await getRoutes();
+      setRoutes(res.data?.data || res.data || []);
+    } catch (err) {
+      console.error('Failed to load routes:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleNearbyStops = async (lat, lng) => {
+    try {
+      const res = await getNearbyStops({ lat, lng });
+      setNearbyStops(res.data?.data || res.data || []);
+    } catch (err) {
+      console.error('Failed to load nearby stops:', err);
+    }
+  };
+
+  const handleSearch = (results) => {
+    // Handle search results (e.g., filter routes or display)
+    console.log('Search results:', results);
+  };
+
+  const handleFindRoutes = (results) => {
+    // Handle find routes results (e.g., display in a list)
+    console.log('Find routes results:', results);
+  };
 
   const handleRouteClick = (routeId) => {
     navigate(`/routes/${routeId}`);
@@ -22,24 +58,6 @@ const RoutesPage = () => {
           <div className="flex items-center space-x-3">
             <div className="w-6 h-6 border-2 border-ndx-primary/30 border-t-ndx-primary rounded-full animate-spin"></div>
             <span className="text-ndx-light">Loading routes...</span>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="min-h-screen px-6 pt-6">
-        <div className="glass rounded-3xl p-8 animate-fade-in">
-          <div className="text-center">
-            <p className="text-ndx-alert mb-4">Error loading routes: {error}</p>
-            <button
-              onClick={refetch}
-              className="px-6 py-2 bg-ndx-primary text-white rounded-xl hover:bg-ndx-primary/80 transition-colors"
-            >
-              Retry
-            </button>
           </div>
         </div>
       </div>
@@ -122,10 +140,27 @@ const RoutesPage = () => {
         </div>
       )}
 
-      {activeTab === 'search' && <SearchLocationsForm />}
-      {activeTab === 'find' && <FindRoutesForm />}
+      {activeTab === 'search' && <SearchLocationsForm onSearch={handleSearch} />}
+      {activeTab === 'find' && <FindRoutesForm onFind={handleFindRoutes} />}
+
+      <div className="mb-6 space-y-4">
+        <button onClick={() => handleNearbyStops(6.9271, 79.8612)} className="btn">
+          Load Nearby Stops (Colombo)
+        </button>
+      </div>
+
+      {nearbyStops.length > 0 && (
+        <div className="mb-6">
+          <h2 className="text-xl font-semibold">Nearby Stops</h2>
+          <ul className="list-disc pl-5">
+            {nearbyStops.map((stop, i) => (
+              <li key={i}>
+                {stop.name} - {stop.lat}, {stop.lng}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   );
-};
-
-export default RoutesPage;
+}

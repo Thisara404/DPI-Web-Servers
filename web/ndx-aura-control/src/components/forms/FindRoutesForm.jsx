@@ -1,10 +1,9 @@
-
-import { useState } from 'react';
-import { findRoutes } from '../../api/ndxApi';
+import React, { useState } from 'react';
+import { findRoutes } from '@/api/ndxApi';
 import { useToast } from '@/hooks/use-toast';
 import { MapPin, Route } from 'lucide-react';
 
-const FindRoutesForm = () => {
+export default function FindRoutesForm({ onFind } = {}) {
   const [formData, setFormData] = useState({
     originLat: '',
     originLng: '',
@@ -41,7 +40,9 @@ const FindRoutesForm = () => {
       const to = `${formData.destLat},${formData.destLng}`;
       
       const response = await findRoutes(from, to);
-      setResults(response.data || []);
+      const data = response.data?.data || response.data || [];
+      setResults(data);
+      onFind?.(data);
       
       toast({
         title: "Routes Found",
@@ -60,10 +61,10 @@ const FindRoutesForm = () => {
   };
 
   return (
-    <div className="glass rounded-3xl p-8 animate-fade-in">
+    <div className="mb-4 glass rounded-3xl p-8 animate-fade-in">
       <h2 className="text-2xl font-semibold text-ndx-light mb-6">Find Routes</h2>
       
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={handleSubmit} className="flex gap-2">
         {/* Origin Coordinates */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
@@ -75,7 +76,7 @@ const FindRoutesForm = () => {
               onChange={handleInputChange}
               step="any"
               placeholder="e.g. 40.7128"
-              className="w-full h-12 px-4 bg-white/10 border border-white/20 rounded-xl text-ndx-light placeholder-ndx-light/60 focus:outline-none focus:ring-2 focus:ring-ndx-primary/50 focus:border-ndx-primary/50 backdrop-blur-md transition-all duration-300"
+              className="input"
             />
           </div>
           <div>
@@ -87,7 +88,7 @@ const FindRoutesForm = () => {
               onChange={handleInputChange}
               step="any"
               placeholder="e.g. -74.0060"
-              className="w-full h-12 px-4 bg-white/10 border border-white/20 rounded-xl text-ndx-light placeholder-ndx-light/60 focus:outline-none focus:ring-2 focus:ring-ndx-primary/50 focus:border-ndx-primary/50 backdrop-blur-md transition-all duration-300"
+              className="input"
             />
           </div>
         </div>
@@ -103,7 +104,7 @@ const FindRoutesForm = () => {
               onChange={handleInputChange}
               step="any"
               placeholder="e.g. 40.7831"
-              className="w-full h-12 px-4 bg-white/10 border border-white/20 rounded-xl text-ndx-light placeholder-ndx-light/60 focus:outline-none focus:ring-2 focus:ring-ndx-primary/50 focus:border-ndx-primary/50 backdrop-blur-md transition-all duration-300"
+              className="input"
             />
           </div>
           <div>
@@ -115,7 +116,7 @@ const FindRoutesForm = () => {
               onChange={handleInputChange}
               step="any"
               placeholder="e.g. -73.9712"
-              className="w-full h-12 px-4 bg-white/10 border border-white/20 rounded-xl text-ndx-light placeholder-ndx-light/60 focus:outline-none focus:ring-2 focus:ring-ndx-primary/50 focus:border-ndx-primary/50 backdrop-blur-md transition-all duration-300"
+              className="input"
             />
           </div>
         </div>
@@ -164,6 +165,4 @@ const FindRoutesForm = () => {
       )}
     </div>
   );
-};
-
-export default FindRoutesForm;
+}

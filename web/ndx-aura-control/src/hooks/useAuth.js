@@ -1,46 +1,36 @@
+import { useState, useEffect } from 'react';
+import { getDevToken } from '@/api/ndxApi';
 
-import { useState } from 'react';
-import { generateDevToken } from '../api/ndxApi';
+export function useAuth() {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-export const useAuth = () => {
-  const [loading, setLoading] = useState(false);
+  useEffect(() => {
+    const token = localStorage.getItem('jwt');
+    setIsAuthenticated(!!token);
+    setLoading(false);
+  }, []);
 
   const login = async () => {
     try {
-      setLoading(true);
-      const response = await generateDevToken();
-      
-      if (response.data && response.data.token) {
-        localStorage.setItem('jwt', response.data.token);
-        return { success: true };
+      const res = await getDevToken();
+      if (res.data.success && res.data.token) {
+        localStorage.setItem('jwt', res.data.token);
+        setIsAuthenticated(true);
+        return true;
       } else {
-        return { success: false, error: 'No token received from server' };
+        throw new Error(res.data.message || 'Failed to get token');
       }
-    } catch (error) {
-      console.error('Login failed:', error);
-      let errorMessage = 'Failed to generate dev token';
-      
-      if (error.code === 'ERR_NETWORK') {
-        errorMessage = 'Cannot connect to NDX server. Please ensure the server is running at ' + (import.meta.env.VITE_NDX_URL || 'http://localhost:3000');
-      } else if (error.response?.data?.message) {
-        errorMessage = error.response.data.message;
-      } else if (error.message) {
-        errorMessage = error.message;
-      }
-      
-      return { success: false, error: errorMessage };
-    } finally {
-      setLoading(false);
+    } catch (err) {
+      console.error('Login failed:', err);
+      return false;
     }
   };
 
   const logout = () => {
     localStorage.removeItem('jwt');
+    setIsAuthenticated(false);
   };
 
-  const isAuthenticated = () => {
-    return !!localStorage.getItem('jwt');
-  };
-
-  return { login, logout, isAuthenticated, loading };
-};
+  return { isAuthenticated, loading, login, logout };
+}

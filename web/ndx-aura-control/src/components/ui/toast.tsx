@@ -4,6 +4,7 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { X } from "lucide-react"
 
 import { cn } from "@/lib/utils"
+import { useToast } from "@/hooks/use-toast"
 
 const ToastProvider = ToastPrimitives.Provider
 
@@ -124,4 +125,16 @@ export {
   ToastDescription,
   ToastClose,
   ToastAction,
+}
+
+export function ToastComponent({ message, type = "info" }) {
+  const { toast } = useToast()
+
+  React.useEffect(() => {
+    if (message) {
+      toast({ title: type.toUpperCase(), description: message, variant: type })
+    }
+  }, [message, type, toast])
+
+  return null
 }
