@@ -24,29 +24,26 @@ class ScheduleProvider extends ChangeNotifier {
     try {
       final response = await _apiService.get(
         ApiEndpoints.activeSchedules,
-        fromJsonT: (json) => json,
+        fromJsonT: (json) => json, // FIX: Return raw JSON
       );
 
       if (response.data != null) {
         final data = response.data as Map<String, dynamic>;
+        final schedulesData = data['schedules'] ??
+            data['data'] ??
+            data['items'] ??
+            []; // FIX: Include 'items'
 
-        if (data['success'] == true) {
-          final schedulesData = data['schedules'] ?? data['data'] ?? [];
-
-          if (schedulesData is List) {
-            _schedules = schedulesData
-                .where((item) => item is Map<String, dynamic>)
-                .map((scheduleJson) =>
-                    Schedule.fromJson(scheduleJson as Map<String, dynamic>))
-                .toList();
-          } else {
-            _schedules = [];
-          }
+        if (schedulesData is List) {
+          _schedules = schedulesData
+              .where((item) => item is Map<String, dynamic>)
+              .map((scheduleJson) =>
+                  Schedule.fromJson(scheduleJson as Map<String, dynamic>))
+              .toList();
         } else {
-          _error = data['message'] as String? ?? 'Failed to fetch schedules';
+          _schedules = [];
         }
       } else {
-        // FIX: Use the message from the ApiResponse for better error details.
         _error = response.message ?? 'Failed to fetch schedules';
       }
     } catch (e) {

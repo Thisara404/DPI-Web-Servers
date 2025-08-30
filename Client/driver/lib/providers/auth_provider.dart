@@ -16,6 +16,16 @@ class AuthProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get error => _error;
 
+  // New method to check if tokens exist locally
+  Future<bool> hasValidTokens() async {
+    try {
+      final token = await _authService.getAccessToken();
+      return token != null && token.isNotEmpty;
+    } catch (e) {
+      return false;
+    }
+  }
+
   Future<void> register(Driver driver) async {
     _setLoading(true);
     _clearError();
@@ -30,6 +40,7 @@ class AuthProvider extends ChangeNotifier {
         }
         _driver = response.driver;
         _isAuthenticated = true;
+        notifyListeners(); // FIX: Notify listeners to update UI immediately
       } else {
         throw Exception(response.message);
       }
@@ -55,6 +66,7 @@ class AuthProvider extends ChangeNotifier {
         }
         _driver = response.driver;
         _isAuthenticated = true;
+        notifyListeners(); // FIX: Notify listeners to update UI immediately
       } else {
         throw Exception(response.message);
       }
@@ -73,14 +85,31 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  // Improved loadProfile with offline fallback
   Future<void> loadProfile() async {
     try {
       _driver = await _authService.getProfile();
-      _isAuthenticated = _driver != null;
-      notifyListeners();
+      if (_driver != null) {
+        _isAuthenticated = true;
+      } else {
+        final hasTokens = await hasValidTokens();
+        if (hasTokens) {
+          _isAuthenticated = true;
+          _error = 'Profile load failed. Using offline mode.';
+        } else {
+          _isAuthenticated = false;
+        }
+      }
+      notifyListeners(); // FIX: Ensure UI updates
     } catch (e) {
-      _isAuthenticated = false;
-      _driver = null;
+      final hasTokens = await hasValidTokens();
+      if (hasTokens) {
+        _isAuthenticated = true;
+        _error = 'Network error. Using offline mode.';
+      } else {
+        _isAuthenticated = false;
+        _driver = null;
+      }
       notifyListeners();
     }
   }

@@ -15,12 +15,31 @@ class LocationProvider extends ChangeNotifier {
 
   Future<void> startTracking(String scheduleId, String journeyId) async {
     try {
+      // Request permissions explicitly
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          _error = 'Location permissions denied';
+          notifyListeners();
+          return;
+        }
+      }
+      if (permission == LocationPermission.deniedForever) {
+        _error = 'Location permissions permanently denied. Enable in settings.';
+        notifyListeners();
+        return;
+      }
+
       _isTracking = true;
       _error = null;
       notifyListeners();
 
       // Get initial position
       _currentPosition = await LocationService.getCurrentLocation();
+      if (_currentPosition == null) {
+        _error = 'Unable to get current location';
+      }
       notifyListeners();
 
       // Start periodic location updates

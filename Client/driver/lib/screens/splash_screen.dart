@@ -21,11 +21,20 @@ class _SplashScreenState extends State<SplashScreen> {
 
     if (mounted) {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      await authProvider.loadProfile();
 
-      if (authProvider.isAuthenticated) {
-        Navigator.pushReplacementNamed(context, '/home');
+      // Check if tokens exist locally first
+      final hasTokens = await authProvider.hasValidTokens();
+
+      if (hasTokens) {
+        // Only load profile if tokens exist
+        await authProvider.loadProfile();
+        if (authProvider.isAuthenticated) {
+          Navigator.pushReplacementNamed(context, '/home');
+        } else {
+          Navigator.pushReplacementNamed(context, '/login');
+        }
       } else {
+        // No tokens, go to login
         Navigator.pushReplacementNamed(context, '/login');
       }
     }

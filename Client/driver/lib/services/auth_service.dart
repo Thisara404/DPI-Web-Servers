@@ -88,7 +88,8 @@ class AuthService extends ApiService {
     try {
       final apiResponse = await get<Driver>(
         ApiEndpoints.profile,
-        fromJsonT: (json) => Driver.fromJson(json['data'] ?? json),
+        fromJsonT: (json) => Driver.fromJson(
+            json['driver'] ?? json), // FIX: Access nested driver
       );
       return apiResponse.data;
     } catch (e) {

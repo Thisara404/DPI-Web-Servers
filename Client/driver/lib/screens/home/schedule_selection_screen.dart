@@ -84,18 +84,6 @@ class _ScheduleSelectionScreenState extends State<ScheduleSelectionScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Available Schedules'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () {
-              Provider.of<ScheduleProvider>(context, listen: false)
-                  .fetchActiveSchedules();
-            },
-          ),
-        ],
-      ),
       body: Consumer<ScheduleProvider>(
         builder: (context, scheduleProvider, child) {
           if (scheduleProvider.isLoading) {
@@ -219,7 +207,13 @@ class _ScheduleSelectionScreenState extends State<ScheduleSelectionScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Route ${schedule.routeId}',
+                        // Prefer routeName (friendly), fallback to routeId or "Route"
+                        schedule.routeName != null &&
+                                schedule.routeName!.isNotEmpty
+                            ? schedule.routeName!
+                            : (schedule.routeId.isNotEmpty
+                                ? 'Route ${schedule.routeId}'
+                                : 'Route'),
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,

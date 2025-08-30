@@ -3,69 +3,71 @@
 import 'dart:convert';
 
 class Driver {
-  final String? id;
+  final String id;
   final String firstName;
   final String lastName;
   final String email;
   final String phone;
-  final String? password;
-  final String? licenseNumber;
-  final DateTime? licenseExpiry; // Add this field
-  final String? vehicleNumber;
-  final String? vehicleType;
-  final String? status;
-  final bool? isVerified;
-  final DateTime? lastActive;
+  final String licenseNumber;
+  final DateTime?
+      licenseExpiry; // FIX: Change to DateTime? for proper date handling
+  final String vehicleNumber;
+  final String vehicleType;
+  final String status;
+  final bool isVerified;
+  final bool isOnline;
 
   Driver({
-    this.id,
+    required this.id,
     required this.firstName,
     required this.lastName,
     required this.email,
     required this.phone,
-    this.password,
-    this.licenseNumber,
-    this.licenseExpiry, // Add this parameter
-    this.vehicleNumber,
-    this.vehicleType,
-    this.status,
-    this.isVerified,
-    this.lastActive,
+    required this.licenseNumber,
+    this.licenseExpiry, // Now optional DateTime
+    required this.vehicleNumber,
+    required this.vehicleType,
+    required this.status,
+    required this.isVerified,
+    this.isOnline = false,
   });
 
   factory Driver.fromJson(Map<String, dynamic> json) {
     return Driver(
-      id: json['_id'],
-      firstName: json['firstName'],
-      lastName: json['lastName'],
-      email: json['email'],
-      phone: json['phone'],
-      licenseNumber: json['licenseNumber'],
-      licenseExpiry: json['licenseExpiry'] != null
-          ? DateTime.parse(json['licenseExpiry'])
+      id: json['id'] is String ? json['id'] : '',
+      firstName: json['firstName'] is String ? json['firstName'] : '',
+      lastName: json['lastName'] is String ? json['lastName'] : '',
+      email: json['email'] is String ? json['email'] : '',
+      phone: json['phone'] is String ? json['phone'] : '',
+      licenseNumber:
+          json['licenseNumber'] is String ? json['licenseNumber'] : '',
+      licenseExpiry: json['licenseExpiry'] is String
+          ? DateTime.tryParse(json['licenseExpiry'])
           : null,
-      vehicleNumber: json['vehicleNumber'],
-      vehicleType: json['vehicleType'],
-      status: json['status'],
-      isVerified: json['isVerified'],
-      lastActive: json['lastActive'] != null
-          ? DateTime.parse(json['lastActive'])
-          : null,
+      vehicleNumber:
+          json['vehicleNumber'] is String ? json['vehicleNumber'] : '',
+      vehicleType: json['vehicleType'] is String ? json['vehicleType'] : 'bus',
+      status: json['status'] is String ? json['status'] : 'pending',
+      isVerified: json['isVerified'] is bool ? json['isVerified'] : false,
+      isOnline: json['isOnline'] is bool ? json['isOnline'] : false,
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
+      'id': id,
       'firstName': firstName,
       'lastName': lastName,
       'email': email,
       'phone': phone,
-      if (password != null) 'password': password,
-      if (licenseNumber != null) 'licenseNumber': licenseNumber,
-      if (licenseExpiry != null)
-        'licenseExpiry': licenseExpiry!.toIso8601String(), // Add this
-      if (vehicleNumber != null) 'vehicleNumber': vehicleNumber,
-      if (vehicleType != null) 'vehicleType': vehicleType,
+      'licenseNumber': licenseNumber,
+      'licenseExpiry': licenseExpiry
+          ?.toIso8601String(), // FIX: Convert DateTime back to string for JSON
+      'vehicleNumber': vehicleNumber,
+      'vehicleType': vehicleType,
+      'status': status,
+      'isVerified': isVerified,
+      'isOnline': isOnline,
     };
   }
 }
@@ -98,11 +100,14 @@ class AuthResponse {
         final data = json['data'];
         final response = AuthResponse(
           success: json['success'] ?? false,
-          message: json['message'] ?? '',
-          driver:
-              data['driver'] != null ? Driver.fromJson(data['driver']) : null,
-          accessToken: data['tokens']?['accessToken'],
-          refreshToken: data['tokens']?['refreshToken'],
+          message: json['message'] is String
+              ? json['message']
+              : '', // FIX: Type check
+          driver: data != null && data['driver'] != null
+              ? Driver.fromJson(data['driver'])
+              : null,
+          accessToken: data?['tokens']?['accessToken'],
+          refreshToken: data?['tokens']?['refreshToken'],
         );
 
         print(
@@ -112,7 +117,9 @@ class AuthResponse {
         // Refresh token response structure
         final response = AuthResponse(
           success: json['success'] ?? false,
-          message: json['message'] ?? '',
+          message: json['message'] is String
+              ? json['message']
+              : '', // FIX: Type check
           driver: null,
           accessToken: json['accessToken'],
           refreshToken: json['refreshToken'],

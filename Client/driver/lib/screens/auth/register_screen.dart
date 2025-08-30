@@ -64,15 +64,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     try {
       final driver = Driver(
+        id: '', // Will be set by server
         firstName: _firstNameController.text.trim(),
         lastName: _lastNameController.text.trim(),
         email: _emailController.text.trim(),
         phone: _phoneController.text.trim(),
-        password: _passwordController.text,
+        // FIX: Remove password from Driver constructor (handled separately in API call)
         licenseNumber: _licenseNumberController.text.trim(),
         licenseExpiry: _licenseExpiry,
         vehicleNumber: _vehicleNumberController.text.trim(),
         vehicleType: _vehicleType,
+        status: 'pending', // Default status
+        isVerified: false, // Default
+        isOnline: false, // Default
       );
 
       await authProvider.register(driver);

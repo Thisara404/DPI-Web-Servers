@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:bus_driver_app/screens/home/schedule_selection_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:provider/provider.dart';
@@ -6,7 +7,7 @@ import '../../config/theme.dart';
 import '../../providers/schedule_provider.dart';
 import '../../providers/journey_provider.dart';
 import '../../providers/location_provider.dart';
-import '../../models/schedule_model.dart'; // Add this import
+import '../../models/schedule_model.dart';
 
 class JourneyScreen extends StatefulWidget {
   const JourneyScreen({super.key});
@@ -18,12 +19,19 @@ class JourneyScreen extends StatefulWidget {
 class _JourneyScreenState extends State<JourneyScreen> {
   GoogleMapController? _mapController;
   Timer? _locationUpdateTimer;
+  bool _mapReady = false;
 
   @override
   void initState() {
     super.initState();
+    // Delay until first frame to access providers safely
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _startLocationTracking();
+      // Only attempt auto-start if a schedule is already selected
+      final scheduleProvider =
+          Provider.of<ScheduleProvider>(context, listen: false);
+      if (scheduleProvider.selectedSchedule != null) {
+        _startLocationTracking();
+      }
     });
   }
 
@@ -45,14 +53,24 @@ class _JourneyScreenState extends State<JourneyScreen> {
       if (selectedSchedule != null) {
         await locationProvider.startTracking(
             selectedSchedule.id, selectedSchedule.journeyId ?? '');
+        print(
+            '✅ Location tracking started for schedule: ${selectedSchedule.id}');
+      } else {
+        print('❌ No selected schedule for tracking');
+        // FIX: Show user-friendly message
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Please select a schedule first')),
+          );
+        }
       }
     } catch (e) {
+      print('❌ Failed to start location tracking: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to start location tracking: ${e.toString()}'),
-            backgroundColor: AppTheme.errorRed,
-          ),
+              content:
+                  Text('Failed to start location tracking: ${e.toString()}')),
         );
       }
     }
@@ -143,20 +161,15 @@ class _JourneyScreenState extends State<JourneyScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Live Journey'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.stop, color: AppTheme.errorRed),
-            onPressed: _endJourney,
-          ),
-        ],
-      ),
       body: Consumer3<ScheduleProvider, JourneyProvider, LocationProvider>(
         builder: (context, scheduleProvider, journeyProvider, locationProvider,
             child) {
           final selectedSchedule = scheduleProvider.selectedSchedule;
           final currentPosition = locationProvider.currentPosition;
+          final locationError = locationProvider.error;
+
+          print(
+              '🔍 Journey Screen - Current Position: $currentPosition, Error: $locationError');
 
           return Column(
             children: [
@@ -170,7 +183,12 @@ class _JourneyScreenState extends State<JourneyScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Route ${selectedSchedule.routeId}',
+                        selectedSchedule.routeName != null &&
+                                selectedSchedule.routeName!.isNotEmpty
+                            ? selectedSchedule.routeName!
+                            : (selectedSchedule.routeId.isNotEmpty
+                                ? 'Route ${selectedSchedule.routeId}'
+                                : 'Route'),
                         style: Theme.of(context)
                             .textTheme
                             .headlineMedium
@@ -192,90 +210,119 @@ class _JourneyScreenState extends State<JourneyScreen> {
                           ),
                         ],
                       ),
+                    ],
+                  ),
+                ),
+              ] else
+                // No selected schedule -> show friendly prompt instead of spinner
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  color: AppTheme.surfaceDark,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
                       const SizedBox(height: 8),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Row(
-                            children: [
-                              Icon(
-                                locationProvider.isTracking
-                                    ? Icons.gps_fixed
-                                    : Icons.gps_off,
-                                color: locationProvider.isTracking
-                                    ? AppTheme.successGreen
-                                    : AppTheme.errorRed,
-                                size: 16,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                locationProvider.isTracking
-                                    ? 'Live Tracking Active'
-                                    : 'Tracking Disabled',
-                                style: TextStyle(
-                                  color: locationProvider.isTracking
-                                      ? AppTheme.successGreen
-                                      : AppTheme.errorRed,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
-                          ),
-                          if (currentPosition != null)
-                            Text(
-                              '${currentPosition.latitude.toStringAsFixed(4)}, ${currentPosition.longitude.toStringAsFixed(4)}',
-                              style: Theme.of(context).textTheme.bodySmall,
+                      const Text(
+                        'No schedule selected',
+                        style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white),
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Please select a schedule from the Schedules tab before starting a journey.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: AppTheme.textSecondary),
+                      ),
+                      const SizedBox(height: 12),
+                      ElevatedButton(
+                        onPressed: () {
+                          // Navigate to schedules screen
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) =>
+                                  const ScheduleSelectionScreen(),
                             ),
-                        ],
+                          );
+                        },
+                        child: const Text('View Schedules'),
                       ),
                     ],
                   ),
                 ),
-              ],
 
-              // Map View
+              // Map View with improved handling
               Expanded(
-                child: currentPosition != null
-                    ? GoogleMap(
-                        onMapCreated: (controller) {
-                          _mapController = controller;
-                        },
-                        initialCameraPosition: CameraPosition(
-                          target: LatLng(
-                            currentPosition.latitude,
-                            currentPosition.longitude,
-                          ),
-                          zoom: 16,
-                        ),
-                        markers: {
-                          Marker(
-                            markerId: const MarkerId('current_location'),
-                            position: LatLng(
-                              currentPosition.latitude,
-                              currentPosition.longitude,
+                child: selectedSchedule == null
+                    ? const SizedBox.shrink()
+                    : locationError != null
+                        ? Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.error_outline,
+                                    size: 64, color: AppTheme.errorRed),
+                                const SizedBox(height: 16),
+                                Text(
+                                  locationError,
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(fontSize: 16),
+                                ),
+                                const SizedBox(height: 12),
+                                ElevatedButton(
+                                  onPressed: () => _startLocationTracking(),
+                                  child: const Text('Retry'),
+                                ),
+                              ],
                             ),
-                            infoWindow:
-                                const InfoWindow(title: 'Your Location'),
-                            icon: BitmapDescriptor.defaultMarkerWithHue(
-                                BitmapDescriptor.hueGreen),
-                          ),
-                        },
-                        myLocationEnabled: true,
-                        myLocationButtonEnabled: true,
-                        mapType: MapType.normal,
-                        compassEnabled: true,
-                        trafficEnabled: true,
-                      )
-                    : const Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            CircularProgressIndicator(),
-                            SizedBox(height: 16),
-                            Text('Getting your location...'),
-                          ],
-                        ),
-                      ),
+                          )
+                        : currentPosition != null
+                            ? GoogleMap(
+                                onMapCreated: (controller) {
+                                  _mapController = controller;
+                                  setState(() => _mapReady = true);
+                                  _mapController?.animateCamera(
+                                    CameraUpdate.newLatLngZoom(
+                                      LatLng(currentPosition.latitude,
+                                          currentPosition.longitude),
+                                      16,
+                                    ),
+                                  );
+                                },
+                                initialCameraPosition: CameraPosition(
+                                  target: LatLng(currentPosition.latitude,
+                                      currentPosition.longitude),
+                                  zoom: 16,
+                                ),
+                                markers: {
+                                  Marker(
+                                    markerId:
+                                        const MarkerId('current_location'),
+                                    position: LatLng(currentPosition.latitude,
+                                        currentPosition.longitude),
+                                    infoWindow: const InfoWindow(
+                                        title: 'Your Location'),
+                                    icon: BitmapDescriptor.defaultMarkerWithHue(
+                                        BitmapDescriptor.hueGreen),
+                                  ),
+                                },
+                                myLocationEnabled: true,
+                                myLocationButtonEnabled: true,
+                                mapType: MapType.normal,
+                              )
+                            : Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: const [
+                                    CircularProgressIndicator(),
+                                    SizedBox(height: 16),
+                                    Text('Getting your location...'),
+                                  ],
+                                ),
+                              ),
               ),
 
               // Bottom Controls
@@ -284,47 +331,16 @@ class _JourneyScreenState extends State<JourneyScreen> {
                 color: AppTheme.surfaceDark,
                 child: Column(
                   children: [
-                    if (locationProvider.error != null) ...[
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        margin: const EdgeInsets.only(bottom: 12),
-                        decoration: BoxDecoration(
-                          color: AppTheme.errorRed.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: AppTheme.errorRed),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.error, color: AppTheme.errorRed),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Text(
-                                locationProvider.error!,
-                                style:
-                                    const TextStyle(color: AppTheme.errorRed),
-                              ),
-                            ),
-                            TextButton(
-                              onPressed: locationProvider.clearError,
-                              child: const Text('Dismiss'),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
                     Row(
                       children: [
                         Expanded(
                           child: ElevatedButton.icon(
-                            onPressed: locationProvider.isTracking
-                                ? null
-                                : () {
-                                    if (selectedSchedule != null) {
-                                      locationProvider.startTracking(
-                                          selectedSchedule.id,
-                                          selectedSchedule.journeyId ?? '');
-                                    }
-                                  },
+                            onPressed: (selectedSchedule != null &&
+                                    !locationProvider.isTracking)
+                                ? () => locationProvider.startTracking(
+                                    selectedSchedule.id,
+                                    selectedSchedule.journeyId ?? '')
+                                : null,
                             icon: const Icon(Icons.play_arrow),
                             label: const Text('Start Tracking'),
                             style: ElevatedButton.styleFrom(
@@ -347,33 +363,11 @@ class _JourneyScreenState extends State<JourneyScreen> {
                         ),
                       ],
                     ),
-                    if (currentPosition != null) ...[
+                    if (locationProvider.error != null) ...[
                       const SizedBox(height: 12),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.speed,
-                            color: Colors.grey[600],
-                            size: 16,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            'Speed: ${currentPosition.speed.toStringAsFixed(1)} m/s',
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
-                          const SizedBox(width: 16),
-                          Icon(
-                            Icons.gps_fixed,
-                            color: Colors.grey[600],
-                            size: 16,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            'Accuracy: ${currentPosition.accuracy.toStringAsFixed(1)}m',
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
-                        ],
+                      Text(
+                        locationProvider.error!,
+                        style: const TextStyle(color: AppTheme.errorRed),
                       ),
                     ],
                   ],

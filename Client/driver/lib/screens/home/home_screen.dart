@@ -46,19 +46,77 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Bus Driver'),
-        actions: [
+  // Helper to get dynamic app bar title based on selected tab
+  String _getAppBarTitle() {
+    switch (_selectedIndex) {
+      case 0:
+        return 'Dashboard';
+      case 1:
+        return 'Schedules';
+      case 2:
+        return 'Journey';
+      case 3:
+        return 'Profile';
+      default:
+        return 'Bus Driver';
+    }
+  }
+
+  // Helper to get dynamic app bar actions based on selected tab
+  List<Widget> _getAppBarActions() {
+    switch (_selectedIndex) {
+      case 0: // Dashboard - No specific actions
+        return [];
+      case 1: // Schedules - Refresh button
+        return [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: () {
+              Provider.of<ScheduleProvider>(context, listen: false)
+                  .fetchActiveSchedules();
+            },
+          ),
+        ];
+      case 2: // Journey - Stop journey button (if active)
+        final journeyProvider =
+            Provider.of<JourneyProvider>(context, listen: false);
+        if (journeyProvider.isJourneyActive) {
+          return [
+            IconButton(
+              icon: const Icon(Icons.stop, color: AppTheme.errorRed),
+              onPressed: () async {
+                // Add journey end logic here if needed
+                await journeyProvider.endJourney();
+              },
+            ),
+          ];
+        }
+        return [];
+      case 3: // Profile - Logout button
+        return [
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: _logout,
           ),
-        ],
+        ];
+      default:
+        return [
+          IconButton(
+            icon: const Icon(Icons.logout),
+            onPressed: _logout,
+          ),
+        ];
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(_getAppBarTitle()), // Dynamic title
+        actions: _getAppBarActions(), // Dynamic actions
       ),
-      body: _screens[_selectedIndex],
+      body: _screens[_selectedIndex], // Only the selected screen's body
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
         onTap: (index) => setState(() => _selectedIndex = index),
@@ -98,6 +156,43 @@ class DashboardScreen extends StatelessWidget {
         final driver = authProvider.driver;
         final isJourneyActive = journeyProvider.isJourneyActive;
 
+        // FIX: Handle null driver with a loading state
+        if (driver == null) {
+          return const Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(height: 16),
+                Text('Loading driver details...'),
+              ],
+            ),
+          );
+        }
+
+        // FIX: Handle loading/error for schedules
+        if (scheduleProvider.isLoading) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (scheduleProvider.error != null) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.error_outline, size: 64, color: Colors.red),
+                const SizedBox(height: 16),
+                Text(scheduleProvider.error!),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: () => scheduleProvider.fetchActiveSchedules(),
+                  child: const Text('Retry'),
+                ),
+              ],
+            ),
+          );
+        }
+
         return SingleChildScrollView(
           padding: const EdgeInsets.all(20),
           child: Column(
@@ -120,8 +215,9 @@ class DashboardScreen extends StatelessWidget {
                             radius: 30,
                             backgroundColor: AppTheme.successGreen,
                             child: Text(
-                              driver?.firstName.substring(0, 1).toUpperCase() ??
-                                  'D',
+                              driver.firstName.isNotEmpty
+                                  ? driver.firstName[0].toUpperCase()
+                                  : 'D', // FIX: Handle empty firstName
                               style: const TextStyle(
                                 fontSize: 24,
                                 color: Colors.white,
@@ -136,21 +232,20 @@ class DashboardScreen extends StatelessWidget {
                               children: [
                                 Text(
                                   'Welcome back,',
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .bodyMedium
-                                      ?.copyWith(
-                                        color: Colors.grey[600],
-                                      ),
+                                  style: TextStyle(
+                                    color: AppTheme.textSecondary,
+                                    fontSize: 14,
+                                  ),
                                 ),
                                 Text(
-                                  driver?.firstName ?? 'Driver',
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .headlineMedium
-                                      ?.copyWith(
-                                        fontWeight: FontWeight.bold,
-                                      ),
+                                  driver.firstName.isNotEmpty
+                                      ? '${driver.firstName} ${driver.lastName}'
+                                      : 'Driver', // FIX: Show full name or fallback
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
                               ],
                             ),
@@ -162,20 +257,20 @@ class DashboardScreen extends StatelessWidget {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 12, vertical: 6),
                         decoration: BoxDecoration(
-                          color: driver?.status == 'online'
+                          color: driver.status == 'online'
                               ? AppTheme.successGreen.withOpacity(0.1)
                               : Colors.orange.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(
-                            color: driver?.status == 'online'
+                            color: driver.status == 'online'
                                 ? AppTheme.successGreen
                                 : Colors.orange,
                           ),
                         ),
                         child: Text(
-                          driver?.status == 'online' ? 'Online' : 'Offline',
+                          driver.status == 'online' ? 'Online' : 'Offline',
                           style: TextStyle(
-                            color: driver?.status == 'online'
+                            color: driver.status == 'online'
                                 ? AppTheme.successGreen
                                 : Colors.orange,
                             fontWeight: FontWeight.bold,
@@ -276,7 +371,19 @@ class DashboardScreen extends StatelessWidget {
                       (schedule) => Card(
                         margin: const EdgeInsets.only(bottom: 8),
                         child: ListTile(
-                          title: Text('Route: ${schedule.routeId}'),
+                          title: Text(
+                            // Prefer routeName (friendly), fallback to routeId or "Route"
+                            schedule.routeName != null &&
+                                    schedule.routeName!.isNotEmpty
+                                ? schedule.routeName!
+                                : (schedule.routeId.isNotEmpty
+                                    ? 'Route ${schedule.routeId}'
+                                    : 'Route'),
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                           subtitle: Text(
                               'Time: ${schedule.startTime} - ${schedule.endTime}'),
                           trailing: Chip(
@@ -486,11 +593,18 @@ class ProfileScreen extends StatelessWidget {
                   driver.licenseExpiry != null
                       ? '${driver.licenseExpiry!.day}/${driver.licenseExpiry!.month}/${driver.licenseExpiry!.year}'
                       : 'Not set',
-                  Icons.calendar_today, context),
-              _buildInfoCard('Vehicle Number',
-                  driver.vehicleNumber ?? 'Not provided', Icons.directions_bus, context),
-              _buildInfoCard('Vehicle Type',
-                  driver.vehicleType ?? 'Not specified', Icons.category, context),
+                  Icons.calendar_today,
+                  context),
+              _buildInfoCard(
+                  'Vehicle Number',
+                  driver.vehicleNumber ?? 'Not provided',
+                  Icons.directions_bus,
+                  context),
+              _buildInfoCard(
+                  'Vehicle Type',
+                  driver.vehicleType ?? 'Not specified',
+                  Icons.category,
+                  context),
 
               const SizedBox(height: 20),
 
@@ -519,7 +633,8 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildInfoCard(String label, String value, IconData icon, BuildContext context) {
+  Widget _buildInfoCard(
+      String label, String value, IconData icon, BuildContext context) {
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
